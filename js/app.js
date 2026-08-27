@@ -38,30 +38,34 @@ function wireAddToCartButtons(scope) {
 }
 
 /* ---------- Shop page with filters ---------- */
+// applyFilters is deliberately at module scope (not nested inside initShopPage) so
+// refreshPageProductViews() can re-run it after PRODUCTS changes without re-binding
+// the filter checkboxes' event listeners a second time.
+function shopApplyFilters() {
+  if (!document.getElementById("product-grid")) return;
+  const checkedCats = Array.from(document.querySelectorAll(".filter-category:checked")).map(c => c.value);
+  const maxPrice = document.getElementById("price-range")
+    ? Number(document.getElementById("price-range").value)
+    : Infinity;
+
+  let list = PRODUCTS.filter(p => checkedCats.length === 0 || checkedCats.includes(p.category));
+  list = list.filter(p => p.price <= maxPrice);
+
+  renderProducts("product-grid", list);
+  const countEl = document.getElementById("result-count");
+  if (countEl) countEl.textContent = `${list.length} watch${list.length === 1 ? "" : "es"}`;
+}
+
 function initShopPage() {
   const grid = document.getElementById("product-grid");
   if (!grid) return;
 
-  function applyFilters() {
-    const checkedCats = Array.from(document.querySelectorAll(".filter-category:checked")).map(c => c.value);
-    const maxPrice = document.getElementById("price-range")
-      ? Number(document.getElementById("price-range").value)
-      : Infinity;
-
-    let list = PRODUCTS.filter(p => checkedCats.length === 0 || checkedCats.includes(p.category));
-    list = list.filter(p => p.price <= maxPrice);
-
-    renderProducts("product-grid", list);
-    const countEl = document.getElementById("result-count");
-    if (countEl) countEl.textContent = `${list.length} watch${list.length === 1 ? "" : "es"}`;
-  }
-
-  document.querySelectorAll(".filter-category").forEach(cb => cb.addEventListener("change", applyFilters));
+  document.querySelectorAll(".filter-category").forEach(cb => cb.addEventListener("change", shopApplyFilters));
   const priceRange = document.getElementById("price-range");
   if (priceRange) {
     priceRange.addEventListener("input", () => {
       document.getElementById("price-range-value").textContent = formatPrice(Number(priceRange.value));
-      applyFilters();
+      shopApplyFilters();
     });
   }
 
@@ -72,7 +76,7 @@ function initShopPage() {
     if (box) box.checked = true;
   }
 
-  applyFilters();
+  shopApplyFilters();
 }
 
 /* ---------- Product detail page ---------- */
@@ -310,4 +314,25 @@ document.addEventListener("DOMContentLoaded", () => {
   initCartPage();
   initCheckoutPage();
   initOrdersPage();
+});
+
+/* ---------- Live refresh when the catalog changes in another tab ---------- */
+// The browser's "storage" event fires on every OTHER open tab/window of the SAME
+// origin when localStorage changes here - e.g. an admin.html tab editing a price
+// updates a shop.html tab automatically, with no manual refresh needed. It does NOT
+// fire in the tab that made the change (that tab already re-renders itself directly).
+// Each affected view is re-rendered in place rather than reloading the page, and only
+// the pieces that already exist on the current page are touched.
+window.addEventListener("storage", (e) => {
+  if (e.key !== null && e.key !== CATALOG_KEY) return; // ignore unrelated keys (cart, orders, admin auth)
+
+  refreshProducts();
+
+  const featuredGrid = document.getElementById("featured-grid");
+  if (featuredGrid) renderProducts("featured-grid", PRODUCTS.slice(0, 4));
+
+  shopApplyFilters(); // no-ops on pages without a #product-grid
+
+  if (document.getElementById("product-detail-root")) initProductDetailPage();
+  if (document.getElementById("cart-root")) initCartPage();
 });
