@@ -1,6 +1,9 @@
-// Sample product catalog for the Chronara demo site.
-// All data is fictional/placeholder - no real brand or pricing data.
-const PRODUCTS = [
+// Product catalog for the Chronara demo site.
+// BASE_PRODUCTS is the original seed data (fictional, placeholder). The live catalog
+// (what shoppers and the admin panel actually see) is stored in localStorage so that
+// watches added/edited via the admin panel persist and show up across the site,
+// without needing any backend/database.
+const BASE_PRODUCTS = [
   {
     id: 1,
     name: "Chronara Regal",
@@ -75,8 +78,67 @@ const PRODUCTS = [
   }
 ];
 
+const CATALOG_KEY = "chronara_catalog";
+
+function loadCatalog() {
+  let stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem(CATALOG_KEY));
+  } catch (e) {
+    stored = null;
+  }
+  if (!Array.isArray(stored) || stored.length === 0) {
+    stored = JSON.parse(JSON.stringify(BASE_PRODUCTS));
+    localStorage.setItem(CATALOG_KEY, JSON.stringify(stored));
+  }
+  return stored;
+}
+
+let PRODUCTS = loadCatalog();
+
+function refreshProducts() {
+  PRODUCTS = loadCatalog();
+  return PRODUCTS;
+}
+
+function saveCatalog(list) {
+  localStorage.setItem(CATALOG_KEY, JSON.stringify(list));
+  PRODUCTS = list;
+}
+
+function nextProductId() {
+  const list = loadCatalog();
+  return list.reduce((max, p) => Math.max(max, p.id), 0) + 1;
+}
+
+function addProduct(product) {
+  const list = loadCatalog();
+  const newProduct = Object.assign({}, product, { id: nextProductId() });
+  list.push(newProduct);
+  saveCatalog(list);
+  return newProduct;
+}
+
+function updateProduct(id, updates) {
+  const list = loadCatalog();
+  const idx = list.findIndex(p => p.id === Number(id));
+  if (idx !== -1) {
+    list[idx] = Object.assign({}, list[idx], updates);
+    saveCatalog(list);
+  }
+}
+
+function deleteProduct(id) {
+  const list = loadCatalog().filter(p => p.id !== Number(id));
+  saveCatalog(list);
+}
+
+function resetCatalogToDemoData() {
+  saveCatalog(JSON.parse(JSON.stringify(BASE_PRODUCTS)));
+}
+
 function formatPrice(value) {
-  return "₹" + value.toLocaleString("en-IN");
+  return "₹" + Number(value).toLocaleString("en-IN");
 }
 
 function getProductById(id) {

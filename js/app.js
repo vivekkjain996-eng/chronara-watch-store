@@ -225,9 +225,71 @@ function initCheckoutPage() {
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
+    const cart = getCart();
+    if (!cart.length) return;
+
+    const items = cart.map(item => {
+      const p = getProductById(item.id);
+      return p ? { id: p.id, name: p.name, image: p.image, price: p.price, qty: item.qty } : null;
+    }).filter(Boolean);
+
+    const order = {
+      id: generateOrderId(),
+      date: new Date().toISOString(),
+      items: items,
+      total: cartTotal(),
+      customerName: document.getElementById("checkout-name").value,
+      email: document.getElementById("checkout-email").value,
+      city: document.getElementById("checkout-city").value,
+      pin: document.getElementById("checkout-pin").value,
+      address: document.getElementById("checkout-address").value,
+      payment: document.getElementById("checkout-payment").value,
+      status: "Processing"
+    };
+
+    saveOrder(order);
     saveCart([]); // clear cart - demo order "placed"
+    sessionStorage.setItem("chronara_last_order", order.id);
     window.location.href = "order-confirmation.html";
   });
+}
+
+/* ---------- Order history (customer-facing) ---------- */
+function initOrdersPage() {
+  const root = document.getElementById("orders-root");
+  if (!root) return;
+
+  const orders = getOrders();
+  if (!orders.length) {
+    root.innerHTML = `<div class="empty-state"><h3>No orders yet</h3><p>Your past orders will show up here once you place one.</p><br><a class="btn btn-dark" href="shop.html">Start Shopping</a></div>`;
+    return;
+  }
+
+  root.innerHTML = orders.map(order => `
+    <div class="order-card">
+      <div class="order-card-head">
+        <div>
+          <div class="order-id">Order #${order.id}</div>
+          <div class="order-date">${formatOrderDate(order.date)}</div>
+        </div>
+        <span class="order-status">${order.status || "Processing"}</span>
+      </div>
+      <div class="order-items">
+        ${order.items.map(item => `
+          <div class="order-item-row">
+            <img src="${item.image}" alt="${item.name}">
+            <div class="order-item-info">
+              <div class="name">${item.name}</div>
+              <div class="strap">Qty: ${item.qty}</div>
+            </div>
+            <div class="order-item-price">${formatPrice(item.price * item.qty)}</div>
+          </div>`).join("")}
+      </div>
+      <div class="order-card-foot">
+        <span>Deliver to: ${order.city || ""} ${order.pin || ""}</span>
+        <span class="order-total">Total: ${formatPrice(order.total)}</span>
+      </div>
+    </div>`).join("");
 }
 
 /* ---------- Mobile nav ---------- */
@@ -247,4 +309,5 @@ document.addEventListener("DOMContentLoaded", () => {
   initProductDetailPage();
   initCartPage();
   initCheckoutPage();
+  initOrdersPage();
 });

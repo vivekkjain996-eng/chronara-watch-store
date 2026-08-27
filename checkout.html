@@ -35,29 +35,29 @@
     <form id="checkout-form">
       <div class="form-row">
         <label>Full Name</label>
-        <input type="text" required placeholder="Jane Doe">
+        <input type="text" id="checkout-name" required placeholder="Jane Doe">
       </div>
       <div class="form-row">
         <label>Email</label>
-        <input type="email" required placeholder="jane@example.com">
+        <input type="email" id="checkout-email" required placeholder="jane@example.com">
       </div>
       <div class="form-row form-row-2">
         <div>
           <label>City</label>
-          <input type="text" required placeholder="Mumbai">
+          <input type="text" id="checkout-city" required placeholder="Mumbai">
         </div>
         <div>
           <label>PIN Code</label>
-          <input type="text" required placeholder="400001">
+          <input type="text" id="checkout-pin" required placeholder="400001">
         </div>
       </div>
       <div class="form-row">
         <label>Delivery Address</label>
-        <textarea rows="3" required placeholder="Street, area, landmark..."></textarea>
+        <textarea rows="3" id="checkout-address" required placeholder="Street, area, landmark..."></textarea>
       </div>
       <div class="form-row">
         <label>Payment Method (demo only)</label>
-        <select>
+        <select id="checkout-payment">
           <option>Cash on Delivery</option>
           <option>Card (demo — not processed)</option>
           <option>UPI (demo — not processed)</option>
@@ -72,11 +72,12 @@
 </section>
 
 <footer class="site-footer">
-  <div class="footer-bottom">&copy; 2026 Chronara. Demo project — not a real business.</div>
+  <div class="footer-bottom">&copy; 2026 Chronara. Demo project — not a real business. &nbsp;|&nbsp; <a href="admin.html" style="color:#9fb0c2;">Admin Login</a></div>
 </footer>
 
 <script src="js/products.js"></script>
 <script src="js/cart.js"></script>
+<script src="js/orders.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
