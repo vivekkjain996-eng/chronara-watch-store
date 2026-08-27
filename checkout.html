@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout - Chronara</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="announce-bar">DEMO CHECKOUT — NO REAL PAYMENT WILL BE TAKEN</div>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="logo"><img src="images/logo.svg" alt="Chronara logo"> Chronara</a>
+    <nav class="main-nav">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="shop.html">Shop</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+    <div class="header-actions">
+      <a href="cart.html" class="icon-link">🛒<span class="cart-count">0</span></a>
+    </div>
+  </div>
+</header>
+
+<div class="breadcrumb"><a href="index.html">Home</a> / <a href="cart.html">Cart</a> / Checkout</div>
+
+<section class="section">
+  <div class="form-card">
+    <h2 style="margin-bottom:22px;">Checkout</h2>
+    <form id="checkout-form">
+      <div class="form-row">
+        <label>Full Name</label>
+        <input type="text" required placeholder="Jane Doe">
+      </div>
+      <div class="form-row">
+        <label>Email</label>
+        <input type="email" required placeholder="jane@example.com">
+      </div>
+      <div class="form-row form-row-2">
+        <div>
+          <label>City</label>
+          <input type="text" required placeholder="Mumbai">
+        </div>
+        <div>
+          <label>PIN Code</label>
+          <input type="text" required placeholder="400001">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Delivery Address</label>
+        <textarea rows="3" required placeholder="Street, area, landmark..."></textarea>
+      </div>
+      <div class="form-row">
+        <label>Payment Method (demo only)</label>
+        <select>
+          <option>Cash on Delivery</option>
+          <option>Card (demo — not processed)</option>
+          <option>UPI (demo — not processed)</option>
+        </select>
+      </div>
+      <div class="form-row" style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;border-top:1px solid var(--border);padding-top:16px;">
+        <span>Order Total</span><span id="checkout-total">₹0</span>
+      </div>
+      <button type="submit" class="btn btn-dark btn-block">Place Order</button>
+    </form>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-bottom">&copy; 2026 Chronara. Demo project — not a real business.</div>
+</footer>
+
+<script src="js/products.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

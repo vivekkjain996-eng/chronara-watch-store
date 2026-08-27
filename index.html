@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chronara - Timeless Watches</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="announce-bar">FREE SHIPPING ON ORDERS ABOVE ₹5,000 &nbsp;|&nbsp; DEMO STORE — NO REAL PAYMENTS TAKEN</div>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="logo"><img src="images/logo.svg" alt="Chronara logo"> Chronara</a>
+    <nav class="main-nav">
+      <ul>
+        <li><a href="index.html" class="active">Home</a></li>
+        <li><a href="shop.html">Shop</a></li>
+        <li><a href="shop.html?category=men">Men</a></li>
+        <li><a href="shop.html?category=women">Women</a></li>
+        <li><a href="shop.html?category=smart">Smart</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+    <div class="header-actions">
+      <a href="cart.html" class="icon-link">🛒<span class="cart-count">0</span></a>
+      <button class="nav-toggle">☰</button>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <span class="eyebrow">New Collection 2026</span>
+      <h1>Time, Crafted<br>To Perfection</h1>
+      <p>Discover Chronara's collection of precision watches — from classic dress pieces to modern smartwatches, designed for every moment of your day.</p>
+      <a href="shop.html" class="btn btn-primary">Shop Collection</a>
+      <a href="about.html" class="btn btn-outline" style="margin-left:12px;">Our Story</a>
+    </div>
+    <div class="hero-image">
+      <img src="images/watch3.svg" alt="Featured watch">
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-title">
+    <span class="eyebrow">Shop By Category</span>
+    <h2>Find Your Perfect Watch</h2>
+  </div>
+  <div class="category-grid">
+    <a href="shop.html?category=men" class="category-card">
+      <img class="cat-icon" src="images/watch1.svg" alt="Men's watches">
+      <h3>Men's Watches</h3>
+      <p>Bold, classic &amp; timeless</p>
+    </a>
+    <a href="shop.html?category=women" class="category-card">
+      <img class="cat-icon" src="images/watch4.svg" alt="Women's watches">
+      <h3>Women's Watches</h3>
+      <p>Elegant everyday pieces</p>
+    </a>
+    <a href="shop.html?category=smart" class="category-card">
+      <img class="cat-icon" src="images/watch6.svg" alt="Smart watches">
+      <h3>Smart Watches</h3>
+      <p>Stay connected in style</p>
+    </a>
+    <a href="shop.html" class="category-card">
+      <img class="cat-icon" src="images/watch7.svg" alt="All watches">
+      <h3>All Collections</h3>
+      <p>Browse everything</p>
+    </a>
+  </div>
+</section>
+
+<section class="section" style="background:#fff;padding-top:0;">
+  <div class="section-title">
+    <span class="eyebrow">Handpicked For You</span>
+    <h2>Featured Watches</h2>
+  </div>
+  <div class="product-grid" id="featured-grid"></div>
+  <div style="text-align:center;margin-top:44px;">
+    <a href="shop.html" class="btn btn-dark">View All Watches</a>
+  </div>
+</section>
+
+<div class="trust-strip">
+  <div class="trust-grid">
+    <div><h4>Free Shipping</h4><p>On all orders above ₹5,000</p></div>
+    <div><h4>2 Year Warranty</h4><p>On every Chronara watch</p></div>
+    <div><h4>Easy Returns</h4><p>15-day hassle-free returns</p></div>
+    <div><h4>Secure Checkout</h4><p>Demo checkout, no real payment</p></div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <div class="logo" style="color:#fff;"><img src="images/logo.svg" alt="Chronara logo"> Chronara</div>
+      <p>Timeless watches for every moment. A demo storefront built for learning purposes — not a real store.</p>
+    </div>
+    <div>
+      <h4>Shop</h4>
+      <ul>
+        <li><a href="shop.html?category=men">Men's Watches</a></li>
+        <li><a href="shop.html?category=women">Women's Watches</a></li>
+        <li><a href="shop.html?category=smart">Smart Watches</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul>
+        <li><a href="about.html">About Us</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Support</h4>
+      <ul>
+        <li><a href="contact.html">Help Center</a></li>
+        <li><a href="cart.html">Track Order</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">&copy; 2026 Chronara. Demo project — not a real business.</div>
+</footer>
+
+<script src="js/products.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/app.js"></script>
+<script>
+  renderProducts("featured-grid", PRODUCTS.slice(0, 4));
+</script>
+</body>
+</html>

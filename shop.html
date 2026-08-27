@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shop All Watches - Chronara</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="announce-bar">FREE SHIPPING ON ORDERS ABOVE ₹5,000 &nbsp;|&nbsp; DEMO STORE — NO REAL PAYMENTS TAKEN</div>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="logo"><img src="images/logo.svg" alt="Chronara logo"> Chronara</a>
+    <nav class="main-nav">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="shop.html" class="active">Shop</a></li>
+        <li><a href="shop.html?category=men">Men</a></li>
+        <li><a href="shop.html?category=women">Women</a></li>
+        <li><a href="shop.html?category=smart">Smart</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+    <div class="header-actions">
+      <a href="cart.html" class="icon-link">🛒<span class="cart-count">0</span></a>
+      <button class="nav-toggle">☰</button>
+    </div>
+  </div>
+</header>
+
+<div class="breadcrumb"><a href="index.html">Home</a> / Shop</div>
+
+<div class="shop-layout">
+  <aside class="filters">
+    <h4>Category</h4>
+    <div class="filter-group">
+      <label><input type="checkbox" class="filter-category" value="men"> Men's Watches</label>
+      <label><input type="checkbox" class="filter-category" value="women"> Women's Watches</label>
+      <label><input type="checkbox" class="filter-category" value="smart"> Smart Watches</label>
+    </div>
+    <h4>Max Price</h4>
+    <div class="filter-group">
+      <input type="range" id="price-range" min="5000" max="25000" step="500" value="25000" style="width:100%;">
+      <p style="font-size:13px;color:#6b6b6b;margin-top:8px;">Up to <span id="price-range-value">₹25,000</span></p>
+    </div>
+  </aside>
+
+  <div>
+    <div class="shop-results-bar">
+      <span id="result-count">8 watches</span>
+    </div>
+    <div class="product-grid" id="product-grid"></div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <div class="logo" style="color:#fff;"><img src="images/logo.svg" alt="Chronara logo"> Chronara</div>
+      <p>Timeless watches for every moment. A demo storefront built for learning purposes — not a real store.</p>
+    </div>
+    <div>
+      <h4>Shop</h4>
+      <ul>
+        <li><a href="shop.html?category=men">Men's Watches</a></li>
+        <li><a href="shop.html?category=women">Women's Watches</a></li>
+        <li><a href="shop.html?category=smart">Smart Watches</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul>
+        <li><a href="about.html">About Us</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Support</h4>
+      <ul>
+        <li><a href="contact.html">Help Center</a></li>
+        <li><a href="cart.html">Track Order</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">&copy; 2026 Chronara. Demo project — not a real business.</div>
+</footer>
+
+<script src="js/products.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

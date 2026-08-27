@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact Us - Chronara</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="announce-bar">FREE SHIPPING ON ORDERS ABOVE ₹5,000 &nbsp;|&nbsp; DEMO STORE — NO REAL PAYMENTS TAKEN</div>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="logo"><img src="images/logo.svg" alt="Chronara logo"> Chronara</a>
+    <nav class="main-nav">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="shop.html">Shop</a></li>
+        <li><a href="shop.html?category=men">Men</a></li>
+        <li><a href="shop.html?category=women">Women</a></li>
+        <li><a href="shop.html?category=smart">Smart</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html" class="active">Contact</a></li>
+      </ul>
+    </nav>
+    <div class="header-actions">
+      <a href="cart.html" class="icon-link">🛒<span class="cart-count">0</span></a>
+      <button class="nav-toggle">☰</button>
+    </div>
+  </div>
+</header>
+
+<div class="breadcrumb"><a href="index.html">Home</a> / Contact</div>
+
+<section class="section">
+  <div class="section-title">
+    <span class="eyebrow">Get In Touch</span>
+    <h2>Contact Us</h2>
+  </div>
+  <div class="form-card">
+    <form onsubmit="event.preventDefault(); this.reset(); document.getElementById('contact-success').style.display='block';">
+      <div class="form-row">
+        <label>Name</label>
+        <input type="text" required placeholder="Your name">
+      </div>
+      <div class="form-row">
+        <label>Email</label>
+        <input type="email" required placeholder="you@example.com">
+      </div>
+      <div class="form-row">
+        <label>Message</label>
+        <textarea rows="5" required placeholder="How can we help?"></textarea>
+      </div>
+      <button type="submit" class="btn btn-dark btn-block">Send Message</button>
+      <p id="contact-success" style="display:none;color:#2e7d32;text-align:center;margin-top:14px;font-size:14px;">Thanks! This is a demo form — no message was actually sent.</p>
+    </form>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-bottom">&copy; 2026 Chronara. Demo project — not a real business.</div>
+</footer>
+
+<script src="js/products.js"></script>
+<script src="js/cart.js"></script>
+</body>
+</html>
