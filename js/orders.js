@@ -1,28 +1,25 @@
-// Order history for the demo storefront. No backend - orders are saved to this
-// browser's localStorage when checkout completes, and read back on the "My Orders" page.
-const ORDERS_KEY = "chronara_orders";
+// Order history for the Chronara demo storefront. Orders are now stored server-side
+// (SQLite via /api/orders), so admin can see every order from every customer/device.
+// A customer's own "My Orders" page is scoped by a random per-browser customerId - not a
+// real account system, but enough to keep "my orders" private-ish without one.
+const CUSTOMER_ID_KEY = "chronara_customer_id";
 
-function getOrders() {
-  try {
-    return JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
-  } catch (e) {
-    return [];
+function getCustomerId() {
+  let id = localStorage.getItem(CUSTOMER_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(CUSTOMER_ID_KEY, id);
   }
+  return id;
 }
 
-function saveOrder(order) {
-  const orders = getOrders();
-  orders.unshift(order); // newest first
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+async function placeOrder(orderDetails) {
+  const order = await apiPost("/api/orders", Object.assign({ customerId: getCustomerId() }, orderDetails));
+  return order;
 }
 
-function getOrderById(orderId) {
-  return getOrders().find(o => o.id === orderId);
-}
-
-function generateOrderId() {
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return "CHR" + Date.now().toString().slice(-7) + rand;
+async function getOrders() {
+  return apiGet(`/api/orders?customerId=${encodeURIComponent(getCustomerId())}`);
 }
 
 function formatOrderDate(isoString) {

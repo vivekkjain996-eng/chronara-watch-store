@@ -80,7 +80,7 @@ function initShopPage() {
 }
 
 /* ---------- Product detail page ---------- */
-function initProductDetailPage() {
+async function initProductDetailPage() {
   const root = document.getElementById("product-detail-root");
   if (!root) return;
 
@@ -92,9 +92,31 @@ function initProductDetailPage() {
     return;
   }
 
+  // The list endpoint (already loaded into PRODUCTS) only has the cover image - fetch the
+  // full record for the photo/video gallery. Seed products have no extra media, so they
+  // fall back to the plain single-image layout below, unchanged from before.
+  let media = [];
+  try {
+    const full = await fetchProductWithMedia(product.id);
+    media = full.media || [];
+  } catch (e) {
+    media = [];
+  }
+
   document.title = product.name + " - Chronara";
+  const galleryHTML = media.length
+    ? `
+    <div class="detail-image" id="detail-gallery-main"><img id="detail-main-media" src="${product.image}" alt="${product.name}"></div>
+    <div class="detail-gallery-thumbs">
+      ${media.map((m, i) => m.type === "video"
+        ? `<button type="button" class="detail-thumb detail-thumb-video" data-type="video" data-src="${m.url}" title="Video"><span class="play-icon">▶</span></button>`
+        : `<button type="button" class="detail-thumb${i === 0 ? " active" : ""}" data-type="image" data-src="${m.url}" title="${m.label || ""}"><img src="${m.url}" alt="${m.label || ""}"></button>`
+      ).join("")}
+    </div>`
+    : `<div class="detail-image"><img src="${product.image}" alt="${product.name}"></div>`;
+
   root.innerHTML = `
-    <div class="detail-image"><img src="${product.image}" alt="${product.name}"></div>
+    <div class="detail-gallery">${galleryHTML}</div>
     <div class="detail-info">
       <span class="product-category">${product.category}</span>
       <h1>${product.name}</h1>
@@ -117,6 +139,19 @@ function initProductDetailPage() {
         <a class="btn btn-outline" style="color:#0d1b2a;border-color:#0d1b2a;" href="cart.html">View Cart</a>
       </div>
     </div>`;
+
+  root.querySelectorAll(".detail-thumb").forEach(btn => {
+    btn.addEventListener("click", () => {
+      root.querySelectorAll(".detail-thumb").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const mainEl = document.getElementById("detail-gallery-main");
+      if (btn.dataset.type === "video") {
+        mainEl.innerHTML = `<video src="${btn.dataset.src}" controls autoplay></video>`;
+      } else {
+        mainEl.innerHTML = `<img src="${btn.dataset.src}" alt="${product.name}">`;
+      }
+    });
+  });
 
   const qtyInput = document.getElementById("qty-input");
   document.getElementById("qty-minus").addEventListener("click", () => {
@@ -224,10 +259,128 @@ function initCheckoutPage() {
   const form = document.getElementById("checkout-form");
   if (!form) return;
 
+  const subtotal = cartTotal();
+  const subtotalEl = document.getElementById("checkout-subtotal");
   const totalEl = document.getElementById("checkout-total");
-  if (totalEl) totalEl.textContent = formatPrice(cartTotal());
+  const discountRow = document.getElementById("checkout-discount-row");
+  const discountEl = document.getElementById("checkout-discount");
+  const promoSelect = document.getElementById("checkout-promo");
+  const promoMessage = document.getElementById("checkout-promo-message");
+  const restFieldset = document.getElementById("checkout-rest");
+  const phoneInput = document.getElementById("checkout-phone");
+  const otpInput = document.getElementById("checkout-otp");
+  const otpRow = document.getElementById("checkout-otp-row");
+  const sendOtpBtn = document.getElementById("checkout-send-otp-btn");
+  const verifyOtpBtn = document.getElementById("checkout-verify-otp-btn");
+  const phoneStatus = document.getElementById("checkout-phone-status");
 
-  form.addEventListener("submit", (e) => {
+  if (subtotalEl) subtotalEl.textContent = formatPrice(subtotal);
+  if (totalEl) totalEl.textContent = formatPrice(subtotal);
+
+  function updateTotals(discount) {
+    if (discountRow) discountRow.style.display = discount > 0 ? "flex" : "none";
+    if (discountEl) discountEl.textContent = "-" + formatPrice(discount);
+    if (totalEl) totalEl.textContent = formatPrice(Math.max(0, subtotal - discount));
+  }
+
+  function showPromoMessage(text, ok) {
+    if (!promoMessage) return;
+    promoMessage.style.display = "block";
+    promoMessage.style.color = ok ? "#2e7d32" : "#a6262b";
+    promoMessage.textContent = text;
+  }
+
+  function showPhoneStatus(text, ok) {
+    if (!phoneStatus) return;
+    phoneStatus.style.color = ok ? "#2e7d32" : "#a6262b";
+    phoneStatus.textContent = text;
+  }
+
+  function loadAvailablePromos() {
+    if (!promoSelect) return;
+    // Nice-to-have - if this fails, checkout still works with the "No promo code" default.
+    getAvailablePromos(subtotal).then((promos) => {
+      promos.forEach((promo) => {
+        const option = document.createElement("option");
+        option.value = promo.code;
+        option.textContent = `${promo.code} — ${promo.description}`;
+        promoSelect.appendChild(option);
+      });
+    }).catch(() => {});
+  }
+
+  function unlockCheckout(phone) {
+    if (phoneInput) phoneInput.value = phone;
+    if (restFieldset) restFieldset.disabled = false;
+    showPhoneStatus("✓ Phone verified", true);
+    loadAvailablePromos();
+  }
+
+  if (isPhoneVerified()) {
+    unlockCheckout(getVerifiedPhone());
+  }
+
+  if (sendOtpBtn) {
+    sendOtpBtn.addEventListener("click", async () => {
+      const phone = (phoneInput.value || "").replace(/\D/g, "");
+      if (phone.length !== 10) {
+        showPhoneStatus("Enter a valid 10-digit mobile number.", false);
+        return;
+      }
+      sendOtpBtn.disabled = true;
+      try {
+        const { otp } = await requestOtp(phone);
+        otpRow.style.display = "block";
+        showPhoneStatus(`Demo mode — your OTP is ${otp} (no real SMS sent).`, true);
+        sendOtpBtn.textContent = "Resend OTP";
+      } catch (err) {
+        showPhoneStatus(err.message, false);
+      } finally {
+        sendOtpBtn.disabled = false;
+      }
+    });
+  }
+
+  if (verifyOtpBtn) {
+    verifyOtpBtn.addEventListener("click", async () => {
+      const phone = (phoneInput.value || "").replace(/\D/g, "");
+      verifyOtpBtn.disabled = true;
+      try {
+        const result = await verifyOtpCode(phone, otpInput.value);
+        unlockCheckout(result.phone);
+      } catch (err) {
+        showPhoneStatus(err.message, false);
+      } finally {
+        verifyOtpBtn.disabled = false;
+      }
+    });
+  }
+
+  if (promoSelect) {
+    promoSelect.addEventListener("change", async () => {
+      const code = promoSelect.value;
+      if (!code) {
+        promoMessage.style.display = "none";
+        updateTotals(0);
+        return;
+      }
+      try {
+        const result = await previewPromo(code, subtotal);
+        if (result.valid) {
+          showPromoMessage(`Promo applied: -${formatPrice(result.discount)}`, true);
+          updateTotals(result.discount);
+        } else {
+          showPromoMessage(result.reason || "This code can't be applied.", false);
+          updateTotals(0);
+        }
+      } catch (err) {
+        showPromoMessage("Couldn't check promo code.", false);
+        updateTotals(0);
+      }
+    });
+  }
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const cart = getCart();
     if (!cart.length) return;
@@ -237,33 +390,37 @@ function initCheckoutPage() {
       return p ? { id: p.id, name: p.name, image: p.image, price: p.price, qty: item.qty } : null;
     }).filter(Boolean);
 
-    const order = {
-      id: generateOrderId(),
-      date: new Date().toISOString(),
-      items: items,
-      total: cartTotal(),
-      customerName: document.getElementById("checkout-name").value,
-      email: document.getElementById("checkout-email").value,
-      city: document.getElementById("checkout-city").value,
-      pin: document.getElementById("checkout-pin").value,
-      address: document.getElementById("checkout-address").value,
-      payment: document.getElementById("checkout-payment").value,
-      status: "Processing"
-    };
+    const submitBtn = form.querySelector("button[type=submit]");
+    submitBtn.disabled = true;
 
-    saveOrder(order);
-    saveCart([]); // clear cart - demo order "placed"
-    sessionStorage.setItem("chronara_last_order", order.id);
-    window.location.href = "order-confirmation.html";
+    try {
+      const order = await placeOrder({
+        items: items,
+        promoCode: (promoSelect && promoSelect.value) || undefined,
+        customerName: document.getElementById("checkout-name").value,
+        email: document.getElementById("checkout-email").value,
+        city: document.getElementById("checkout-city").value,
+        pin: document.getElementById("checkout-pin").value,
+        address: document.getElementById("checkout-address").value,
+        payment: document.getElementById("checkout-payment").value
+      });
+
+      saveCart([]); // clear cart - demo order "placed"
+      sessionStorage.setItem("chronara_last_order", order.id);
+      window.location.href = "order-confirmation.html";
+    } catch (err) {
+      alert("Couldn't place order: " + err.message);
+      submitBtn.disabled = false;
+    }
   });
 }
 
 /* ---------- Order history (customer-facing) ---------- */
-function initOrdersPage() {
+async function initOrdersPage() {
   const root = document.getElementById("orders-root");
   if (!root) return;
 
-  const orders = getOrders();
+  const orders = await getOrders();
   if (!orders.length) {
     root.innerHTML = `<div class="empty-state"><h3>No orders yet</h3><p>Your past orders will show up here once you place one.</p><br><a class="btn btn-dark" href="shop.html">Start Shopping</a></div>`;
     return;
@@ -290,8 +447,11 @@ function initOrdersPage() {
           </div>`).join("")}
       </div>
       <div class="order-card-foot">
-        <span>Deliver to: ${order.city || ""} ${order.pin || ""}</span>
-        <span class="order-total">Total: ${formatPrice(order.total)}</span>
+        <span>Deliver to: ${order.city || ""} ${order.pin || ""}${order.phone ? ` &middot; ${order.phone}` : ""}</span>
+        <span class="order-total">
+          ${order.discount > 0 ? `<span style="color:#2e7d32;font-weight:600;margin-right:8px;">${order.promoCode} applied (-${formatPrice(order.discount)})</span>` : ""}
+          Total: ${formatPrice(order.total)}
+        </span>
       </div>
     </div>`).join("");
 }
@@ -306,33 +466,14 @@ function initMobileNav() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   initMobileNav();
+  await loadProducts(); // catalog now comes from the server - load it before rendering anything
   wireAddToCartButtons(document);
+  if (document.getElementById("featured-grid")) renderProducts("featured-grid", PRODUCTS.slice(0, 4));
   initShopPage();
   initProductDetailPage();
   initCartPage();
   initCheckoutPage();
   initOrdersPage();
-});
-
-/* ---------- Live refresh when the catalog changes in another tab ---------- */
-// The browser's "storage" event fires on every OTHER open tab/window of the SAME
-// origin when localStorage changes here - e.g. an admin.html tab editing a price
-// updates a shop.html tab automatically, with no manual refresh needed. It does NOT
-// fire in the tab that made the change (that tab already re-renders itself directly).
-// Each affected view is re-rendered in place rather than reloading the page, and only
-// the pieces that already exist on the current page are touched.
-window.addEventListener("storage", (e) => {
-  if (e.key !== null && e.key !== CATALOG_KEY) return; // ignore unrelated keys (cart, orders, admin auth)
-
-  refreshProducts();
-
-  const featuredGrid = document.getElementById("featured-grid");
-  if (featuredGrid) renderProducts("featured-grid", PRODUCTS.slice(0, 4));
-
-  shopApplyFilters(); // no-ops on pages without a #product-grid
-
-  if (document.getElementById("product-detail-root")) initProductDetailPage();
-  if (document.getElementById("cart-root")) initCartPage();
 });
