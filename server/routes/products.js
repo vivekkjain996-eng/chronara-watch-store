@@ -1,10 +1,9 @@
-const crypto = require("crypto");
-const fs = require("fs");
-const path = require("path");
 const express = require("express");
 const multer = require("multer");
-const { db, resetProductsToSeed, uploadsRoot } = require("../db");
+const { db, resetProductsToSeed } = require("../db");
 const { requireAdmin } = require("../auth");
+const { storeMedia, deleteMedia, cleanupProductStorage, wipeAllLocalMedia } = require("../lib/media");
+const asyncHandler = require("../lib/asyncHandler");
 
 const router = express.Router();
 
@@ -32,80 +31,73 @@ function handleUpload(req, res, next) {
   });
 }
 
-function extFor(file) {
-  const fromName = path.extname(file.originalname || "");
-  if (fromName) return fromName;
-  const guess = (file.mimetype || "").split("/")[1];
-  return guess ? "." + guess : "";
-}
-
-function saveFile(productId, file) {
-  const dir = path.join(uploadsRoot, String(productId));
-  fs.mkdirSync(dir, { recursive: true });
-  const filename = crypto.randomBytes(8).toString("hex") + extFor(file);
-  fs.writeFileSync(path.join(dir, filename), file.buffer);
-  return `/uploads/products/${productId}/${filename}`;
-}
-
-function deleteMediaFile(productId, url) {
-  const abs = path.join(uploadsRoot, String(productId), path.basename(url));
-  fs.unlink(abs, () => {}); // best-effort, ignore errors
-}
-
-function nextSortOrder(productId) {
-  const row = db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM product_media WHERE product_id = ?").get(productId);
+async function nextSortOrder(productId) {
+  const row = await db.get(
+    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM product_media WHERE product_id = ?",
+    [productId]
+  );
   return row.maxOrder + 1;
 }
 
-function getMediaForProduct(productId) {
-  return db.prepare("SELECT id, type, url, label, sort_order FROM product_media WHERE product_id = ? ORDER BY sort_order ASC").all(productId);
+async function getMediaForProduct(productId) {
+  return db.all(
+    "SELECT id, type, url, label, sort_order FROM product_media WHERE product_id = ? ORDER BY sort_order ASC",
+    [productId]
+  );
 }
 
-function syncCoverImage(productId) {
-  const firstImage = db.prepare(`
-    SELECT url FROM product_media WHERE product_id = ? AND type = 'image' ORDER BY sort_order ASC LIMIT 1
-  `).get(productId);
-  if (firstImage) db.prepare("UPDATE products SET image = ? WHERE id = ?").run(firstImage.url, productId);
+async function syncCoverImage(productId) {
+  const firstImage = await db.get(
+    "SELECT url FROM product_media WHERE product_id = ? AND type = 'image' ORDER BY sort_order ASC LIMIT 1",
+    [productId]
+  );
+  if (firstImage) await db.run("UPDATE products SET image = ? WHERE id = ?", [firstImage.url, productId]);
 }
 
 // Adds uploaded photos/video as product_media rows. Only one video is kept per product -
-// uploading a new one replaces the old (file + row).
-function insertMedia(productId, imageFiles, labels, videoFile) {
-  const insertStmt = db.prepare(`
-    INSERT INTO product_media (product_id, type, url, label, sort_order) VALUES (?, ?, ?, ?, ?)
-  `);
-  let order = nextSortOrder(productId);
+// uploading a new one replaces the old (asset + row).
+async function insertMedia(productId, imageFiles, labels, videoFile) {
+  let order = await nextSortOrder(productId);
 
-  (imageFiles || []).forEach((file, i) => {
-    const url = saveFile(productId, file);
+  for (let i = 0; i < (imageFiles || []).length; i++) {
+    const { url, publicId } = await storeMedia(productId, imageFiles[i]);
     const label = labels && labels[i] ? String(labels[i]).trim() : "";
-    insertStmt.run(productId, "image", url, label, order++);
-  });
+    await db.run(
+      "INSERT INTO product_media (product_id, type, url, label, sort_order, public_id) VALUES (?, ?, ?, ?, ?, ?)",
+      [productId, "image", url, label, order++, publicId]
+    );
+  }
 
   if (videoFile) {
-    const existingVideos = db.prepare("SELECT id, url FROM product_media WHERE product_id = ? AND type = 'video'").all(productId);
-    existingVideos.forEach((row) => {
-      deleteMediaFile(productId, row.url);
-      db.prepare("DELETE FROM product_media WHERE id = ?").run(row.id);
-    });
-    const url = saveFile(productId, videoFile);
-    insertStmt.run(productId, "video", url, "", order++);
+    const existingVideos = await db.all(
+      "SELECT id, url, public_id, type FROM product_media WHERE product_id = ? AND type = 'video'",
+      [productId]
+    );
+    for (const row of existingVideos) {
+      await deleteMedia(row, productId);
+      await db.run("DELETE FROM product_media WHERE id = ?", [row.id]);
+    }
+    const { url, publicId } = await storeMedia(productId, videoFile);
+    await db.run(
+      "INSERT INTO product_media (product_id, type, url, label, sort_order, public_id) VALUES (?, ?, ?, ?, ?, ?)",
+      [productId, "video", url, "", order++, publicId]
+    );
   }
 }
 
-router.get("/", (req, res) => {
-  const products = db.prepare("SELECT * FROM products ORDER BY id").all();
+router.get("/", asyncHandler(async (req, res) => {
+  const products = await db.all("SELECT * FROM products ORDER BY id");
   res.json(products);
-});
+}));
 
-router.get("/:id", (req, res) => {
-  const product = db.prepare("SELECT * FROM products WHERE id = ?").get(req.params.id);
+router.get("/:id", asyncHandler(async (req, res) => {
+  const product = await db.get("SELECT * FROM products WHERE id = ?", [req.params.id]);
   if (!product) return res.status(404).json({ error: "Product not found" });
-  product.media = getMediaForProduct(product.id);
+  product.media = await getMediaForProduct(product.id);
   res.json(product);
-});
+}));
 
-router.post("/", requireAdmin, handleUpload, (req, res) => {
+router.post("/", requireAdmin, handleUpload, asyncHandler(async (req, res) => {
   const { name, category, price, strap, description } = req.body;
   const images = (req.files && req.files.images) || [];
   const videoFile = (req.files && req.files.video && req.files.video[0]) || null;
@@ -119,22 +111,22 @@ router.post("/", requireAdmin, handleUpload, (req, res) => {
 
   const labels = Array.isArray(req.body.labels) ? req.body.labels : (req.body.labels ? [req.body.labels] : []);
 
-  const info = db.prepare(`
-    INSERT INTO products (name, category, price, image, strap, description)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(name, category, Number(price), "images/watch1.svg", strap, description); // placeholder, synced right after
+  const info = await db.run(
+    "INSERT INTO products (name, category, price, image, strap, description) VALUES (?, ?, ?, ?, ?, ?)",
+    [name, category, Number(price), "images/watch1.svg", strap, description] // placeholder, synced right after
+  );
   const productId = info.lastInsertRowid;
 
-  insertMedia(productId, images, labels, videoFile);
-  syncCoverImage(productId);
+  await insertMedia(productId, images, labels, videoFile);
+  await syncCoverImage(productId);
 
-  const product = db.prepare("SELECT * FROM products WHERE id = ?").get(productId);
-  product.media = getMediaForProduct(productId);
+  const product = await db.get("SELECT * FROM products WHERE id = ?", [productId]);
+  product.media = await getMediaForProduct(productId);
   res.status(201).json(product);
-});
+}));
 
-router.put("/:id", requireAdmin, (req, res) => {
-  const existing = db.prepare("SELECT * FROM products WHERE id = ?").get(req.params.id);
+router.put("/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await db.get("SELECT * FROM products WHERE id = ?", [req.params.id]);
   if (!existing) return res.status(404).json({ error: "Product not found" });
 
   const merged = {
@@ -145,18 +137,18 @@ router.put("/:id", requireAdmin, (req, res) => {
     description: req.body.description ?? existing.description
   };
 
-  db.prepare(`
-    UPDATE products SET name = ?, category = ?, price = ?, strap = ?, description = ?
-    WHERE id = ?
-  `).run(merged.name, merged.category, merged.price, merged.strap, merged.description, req.params.id);
+  await db.run(
+    "UPDATE products SET name = ?, category = ?, price = ?, strap = ?, description = ? WHERE id = ?",
+    [merged.name, merged.category, merged.price, merged.strap, merged.description, req.params.id]
+  );
 
-  const product = db.prepare("SELECT * FROM products WHERE id = ?").get(req.params.id);
-  product.media = getMediaForProduct(product.id);
+  const product = await db.get("SELECT * FROM products WHERE id = ?", [req.params.id]);
+  product.media = await getMediaForProduct(product.id);
   res.json(product);
-});
+}));
 
-router.post("/:id/media", requireAdmin, handleUpload, (req, res) => {
-  const product = db.prepare("SELECT * FROM products WHERE id = ?").get(req.params.id);
+router.post("/:id/media", requireAdmin, handleUpload, asyncHandler(async (req, res) => {
+  const product = await db.get("SELECT * FROM products WHERE id = ?", [req.params.id]);
   if (!product) return res.status(404).json({ error: "Product not found" });
 
   const images = (req.files && req.files.images) || [];
@@ -166,40 +158,53 @@ router.post("/:id/media", requireAdmin, handleUpload, (req, res) => {
   }
   const labels = Array.isArray(req.body.labels) ? req.body.labels : (req.body.labels ? [req.body.labels] : []);
 
-  insertMedia(product.id, images, labels, videoFile);
-  syncCoverImage(product.id);
+  await insertMedia(product.id, images, labels, videoFile);
+  await syncCoverImage(product.id);
 
-  const updated = db.prepare("SELECT * FROM products WHERE id = ?").get(product.id);
-  updated.media = getMediaForProduct(product.id);
+  const updated = await db.get("SELECT * FROM products WHERE id = ?", [product.id]);
+  updated.media = await getMediaForProduct(product.id);
   res.status(201).json(updated);
-});
+}));
 
-router.delete("/:id/media/:mediaId", requireAdmin, (req, res) => {
-  const media = db.prepare("SELECT * FROM product_media WHERE id = ? AND product_id = ?").get(req.params.mediaId, req.params.id);
+router.delete("/:id/media/:mediaId", requireAdmin, asyncHandler(async (req, res) => {
+  const media = await db.get(
+    "SELECT * FROM product_media WHERE id = ? AND product_id = ?",
+    [req.params.mediaId, req.params.id]
+  );
   if (!media) return res.status(404).json({ error: "Media not found" });
 
   if (media.type === "image") {
-    const { count } = db.prepare("SELECT COUNT(*) AS count FROM product_media WHERE product_id = ? AND type = 'image'").get(req.params.id);
+    const { count } = await db.get(
+      "SELECT COUNT(*) AS count FROM product_media WHERE product_id = ? AND type = 'image'",
+      [req.params.id]
+    );
     if (count <= 1) return res.status(400).json({ error: "Watch must have at least one photo" });
   }
 
-  db.prepare("DELETE FROM product_media WHERE id = ?").run(media.id);
-  deleteMediaFile(req.params.id, media.url);
-  if (media.type === "image") syncCoverImage(req.params.id);
+  await db.run("DELETE FROM product_media WHERE id = ?", [media.id]);
+  await deleteMedia(media, req.params.id);
+  if (media.type === "image") await syncCoverImage(req.params.id);
 
   res.status(204).end();
-});
+}));
 
-router.delete("/:id", requireAdmin, (req, res) => {
-  const info = db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
+router.delete("/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const media = await db.all("SELECT * FROM product_media WHERE product_id = ?", [req.params.id]);
+  for (const m of media) {
+    await deleteMedia(m, req.params.id);
+  }
+  await db.run("DELETE FROM product_media WHERE product_id = ?", [req.params.id]);
+
+  const info = await db.run("DELETE FROM products WHERE id = ?", [req.params.id]);
   if (info.changes === 0) return res.status(404).json({ error: "Product not found" });
-  fs.rmSync(path.join(uploadsRoot, String(req.params.id)), { recursive: true, force: true });
+  cleanupProductStorage(req.params.id);
   res.status(204).end();
-});
+}));
 
-router.post("/reset", requireAdmin, (req, res) => {
-  resetProductsToSeed();
-  res.json(db.prepare("SELECT * FROM products ORDER BY id").all());
-});
+router.post("/reset", requireAdmin, asyncHandler(async (req, res) => {
+  await resetProductsToSeed();
+  wipeAllLocalMedia();
+  res.json(await db.all("SELECT * FROM products ORDER BY id"));
+}));
 
 module.exports = router;

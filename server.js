@@ -4,6 +4,7 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 
+const { init } = require("./server/db");
 const productsRouter = require("./server/routes/products");
 const ordersRouter = require("./server/routes/orders");
 const adminAuthRouter = require("./server/routes/admin");
@@ -36,7 +37,17 @@ app.use("/api/auth", customerAuthRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: "Server error" });
+  // Cloudinary SDK errors carry an http_code (e.g. 400 "Unsupported video format or file") -
+  // surface that instead of a generic 500 so admin gets an actionable message.
+  const status = Number.isInteger(err.http_code) ? err.http_code : 500;
+  res.status(status).json({ error: err.message || "Server error" });
 });
 
-app.listen(port, () => console.log("Serving on http://localhost:" + port));
+init()
+  .then(() => {
+    app.listen(port, () => console.log("Serving on http://localhost:" + port));
+  })
+  .catch((err) => {
+    console.error("Failed to initialize the database:", err);
+    process.exit(1);
+  });

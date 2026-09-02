@@ -1,20 +1,81 @@
-// SQLite setup for the Chronara demo. Single local file DB, zero external services.
+// Database access for Chronara. Two backends behind one async interface (get/all/run/batch):
+//   - Turso (hosted, SQLite-compatible, real persistence) when TURSO_DATABASE_URL is set.
+//   - Local better-sqlite3 file (today's behavior, resets on every redeploy on hosts with no
+//     persistent disk) as a zero-config fallback when it isn't.
+// Every route talks to the same interface either way - only this file knows which backend
+// is actually in use.
 const path = require("path");
 const fs = require("fs");
-const Database = require("better-sqlite3");
-
-const dataDir = path.join(__dirname, "..", "data");
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const uploadsRoot = path.join(__dirname, "..", "uploads", "products");
 if (!fs.existsSync(uploadsRoot)) fs.mkdirSync(uploadsRoot, { recursive: true });
 
-const db = new Database(path.join(dataDir, "chronara.db"));
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+const usingTurso = !!process.env.TURSO_DATABASE_URL;
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS products (
+let db;
+
+if (usingTurso) {
+  const { createClient } = require("@libsql/client");
+  const client = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN
+  });
+
+  db = {
+    async get(sql, args = []) {
+      const res = await client.execute({ sql, args });
+      return res.rows[0];
+    },
+    async all(sql, args = []) {
+      const res = await client.execute({ sql, args });
+      return res.rows;
+    },
+    async run(sql, args = []) {
+      const res = await client.execute({ sql, args });
+      return { changes: res.rowsAffected, lastInsertRowid: res.lastInsertRowid };
+    },
+    async batch(statements) {
+      await client.batch(statements.map((s) => ({ sql: s.sql, args: s.args || [] })), "write");
+    }
+  };
+  console.log("[db] Using Turso (persistent) - TURSO_DATABASE_URL is set.");
+} else {
+  const path2 = require("path");
+  const fs2 = require("fs");
+  const Database = require("better-sqlite3");
+
+  const dataDir = path2.join(__dirname, "..", "data");
+  if (!fs2.existsSync(dataDir)) fs2.mkdirSync(dataDir, { recursive: true });
+
+  const sqlite = new Database(path2.join(dataDir, "chronara.db"));
+  sqlite.pragma("journal_mode = WAL");
+
+  db = {
+    async get(sql, args = []) {
+      return sqlite.prepare(sql).get(...args);
+    },
+    async all(sql, args = []) {
+      return sqlite.prepare(sql).all(...args);
+    },
+    async run(sql, args = []) {
+      const res = sqlite.prepare(sql).run(...args);
+      return { changes: res.changes, lastInsertRowid: res.lastInsertRowid };
+    },
+    async batch(statements) {
+      const tx = sqlite.transaction((stmts) => {
+        stmts.forEach(({ sql, args }) => sqlite.prepare(sql).run(...(args || [])));
+      });
+      tx(statements);
+    }
+  };
+  console.log(
+    "[db] Using local SQLite file (data/chronara.db) - resets on every redeploy on hosts with " +
+    "no persistent disk. Set TURSO_DATABASE_URL/TURSO_AUTH_TOKEN for real persistence."
+  );
+}
+
+const SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     category TEXT NOT NULL,
@@ -22,9 +83,8 @@ db.exec(`
     image TEXT NOT NULL,
     strap TEXT NOT NULL,
     description TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS orders (
+  )`,
+  `CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     customer_id TEXT NOT NULL,
     date TEXT NOT NULL,
@@ -37,18 +97,16 @@ db.exec(`
     address TEXT,
     payment TEXT,
     status TEXT NOT NULL DEFAULT 'Processing'
-  );
-
-  CREATE TABLE IF NOT EXISTS product_media (
+  )`,
+  `CREATE TABLE IF NOT EXISTS product_media (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('image','video')),
     url TEXT NOT NULL,
     label TEXT,
     sort_order INTEGER NOT NULL DEFAULT 0
-  );
-
-  CREATE TABLE IF NOT EXISTS promo_codes (
+  )`,
+  `CREATE TABLE IF NOT EXISTS promo_codes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL UNIQUE,
     type TEXT NOT NULL CHECK (type IN ('percent','flat')),
@@ -58,21 +116,20 @@ db.exec(`
     first_order_only INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
-  );
-`);
+  )`
+];
 
-// Additive migration for the "orders" table (already existed before promo codes were added).
-function ensureColumn(table, column, definition) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+// product_media no longer relies on ON DELETE CASCADE (uncertain whether PRAGMA foreign_keys
+// state is reliably sticky per-request on a remote Turso connection) - products.js explicitly
+// deletes product_media rows before deleting a product instead.
+
+async function ensureColumn(table, column, definition) {
+  const cols = await db.all(`PRAGMA table_info(${table})`);
   if (!cols.some((c) => c.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    await db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 }
-ensureColumn("orders", "promo_code", "TEXT");
-ensureColumn("orders", "discount", "INTEGER NOT NULL DEFAULT 0");
-ensureColumn("orders", "phone", "TEXT");
 
-// Seed data - the original fictional demo catalog. Only used to populate an empty table.
 const SEED_PRODUCTS = [
   { name: "Chronara Regal", category: "men", price: 8995, image: "images/watch1.svg", strap: "Stainless Steel",
     description: "A classic stainless steel case paired with a sunburst silver dial. Timeless design for everyday wear." },
@@ -92,26 +149,37 @@ const SEED_PRODUCTS = [
     description: "All-black tactical design with a matte finish, built for a modern, understated look." }
 ];
 
-function seedProductsIfEmpty() {
-  const { count } = db.prepare("SELECT COUNT(*) AS count FROM products").get();
+async function seedProductsIfEmpty() {
+  const { count } = await db.get("SELECT COUNT(*) AS count FROM products");
   if (count > 0) return;
-  const insert = db.prepare(`
-    INSERT INTO products (name, category, price, image, strap, description)
-    VALUES (@name, @category, @price, @image, @strap, @description)
-  `);
-  const insertMany = db.transaction((rows) => rows.forEach((row) => insert.run(row)));
-  insertMany(SEED_PRODUCTS);
+  await db.batch(SEED_PRODUCTS.map((p) => ({
+    sql: `INSERT INTO products (name, category, price, image, strap, description) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [p.name, p.category, p.price, p.image, p.strap, p.description]
+  })));
 }
 
-function resetProductsToSeed() {
-  db.exec("DELETE FROM products"); // cascades product_media rows via ON DELETE CASCADE
-  db.exec("DELETE FROM sqlite_sequence WHERE name = 'products'");
-  db.exec("DELETE FROM sqlite_sequence WHERE name = 'product_media'");
-  fs.rmSync(uploadsRoot, { recursive: true, force: true });
-  fs.mkdirSync(uploadsRoot, { recursive: true });
-  seedProductsIfEmpty();
+// Only resets DB rows - wiping locally-stored media (if that's the active media backend) is
+// handled by the caller via media.js's wipeAllLocalMedia(), which is independent of which DB
+// backend is in use here.
+async function resetProductsToSeed() {
+  await db.run("DELETE FROM product_media");
+  await db.run("DELETE FROM products");
+  if (!usingTurso) {
+    await db.run("DELETE FROM sqlite_sequence WHERE name = 'products'");
+    await db.run("DELETE FROM sqlite_sequence WHERE name = 'product_media'");
+  }
+  await seedProductsIfEmpty();
 }
 
-seedProductsIfEmpty();
+async function init() {
+  for (const stmt of SCHEMA_STATEMENTS) {
+    await db.run(stmt);
+  }
+  await ensureColumn("orders", "promo_code", "TEXT");
+  await ensureColumn("orders", "discount", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn("orders", "phone", "TEXT");
+  await ensureColumn("product_media", "public_id", "TEXT");
+  await seedProductsIfEmpty();
+}
 
-module.exports = { db, resetProductsToSeed, uploadsRoot };
+module.exports = { db, init, resetProductsToSeed, uploadsRoot, usingTurso };
