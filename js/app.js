@@ -199,15 +199,15 @@ function initCartPage() {
               </div>
             </div>
           </td>
-          <td>${formatPrice(p.price)}</td>
-          <td>
+          <td data-label="Price: ">${formatPrice(p.price)}</td>
+          <td data-label="Quantity: ">
             <div class="qty-control">
               <button type="button" class="cart-qty-minus" data-id="${p.id}">-</button>
               <input type="number" min="1" value="${item.qty}" class="cart-qty-input" data-id="${p.id}">
               <button type="button" class="cart-qty-plus" data-id="${p.id}">+</button>
             </div>
           </td>
-          <td>${formatPrice(p.price * item.qty)}</td>
+          <td data-label="Subtotal: ">${formatPrice(p.price * item.qty)}</td>
           <td><span class="remove-link" data-id="${p.id}">Remove</span></td>
         </tr>`;
     }).join("");

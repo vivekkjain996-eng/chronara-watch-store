@@ -178,9 +178,9 @@ function renderAdminTable() {
   tbody.innerHTML = PRODUCTS.map(p => `
     <tr>
       <td><img src="${p.image}" alt="${p.name}" style="width:44px;height:44px;object-fit:contain;"></td>
-      <td>${p.name}</td>
-      <td style="text-transform:capitalize;">${p.category}</td>
-      <td>${formatPrice(p.price)}</td>
+      <td data-label="Name: ">${p.name}</td>
+      <td data-label="Category: " style="text-transform:capitalize;">${p.category}</td>
+      <td data-label="Price: ">${formatPrice(p.price)}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-outline admin-edit-btn" data-id="${p.id}" style="padding:6px 14px;font-size:11.5px;color:#0d1b2a;border-color:#0d1b2a;">Edit</button>
         <button class="btn btn-outline admin-delete-btn" data-id="${p.id}" style="padding:6px 14px;font-size:11.5px;color:#a6262b;border-color:#a6262b;">Delete</button>
@@ -602,10 +602,10 @@ async function renderPromoTable() {
     if (p.first_order_only) conditions.push("First order only");
     return `
     <tr>
-      <td><code>${p.code}</code></td>
-      <td>${p.type === "percent" ? p.value + "%" : formatPrice(p.value)}</td>
-      <td style="font-size:12.5px;color:#6b6b6b;">${conditions.join(", ") || "—"}</td>
-      <td>
+      <td data-label="Code: "><code>${p.code}</code></td>
+      <td data-label="Discount: ">${p.type === "percent" ? p.value + "%" : formatPrice(p.value)}</td>
+      <td data-label="Conditions: " style="font-size:12.5px;color:#6b6b6b;">${conditions.join(", ") || "—"}</td>
+      <td data-label="Status: ">
         <button class="btn btn-outline admin-promo-toggle" data-id="${p.id}" data-active="${p.active}" style="padding:5px 12px;font-size:11px;${p.active ? "color:#2e7d32;border-color:#2e7d32;" : "color:#6b6b6b;border-color:#6b6b6b;"}">${p.active ? "Active" : "Inactive"}</button>
       </td>
       <td><button class="btn btn-outline admin-promo-delete" data-id="${p.id}" style="padding:5px 12px;font-size:11px;color:#a6262b;border-color:#a6262b;">Delete</button></td>

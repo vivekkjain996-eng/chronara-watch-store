@@ -35,12 +35,12 @@
     <form id="checkout-form">
       <div class="form-row" id="checkout-phone-section">
         <label>Mobile Number</label>
-        <div style="display:flex;gap:10px;">
+        <div class="checkout-inline-row" style="display:flex;gap:10px;">
           <input type="tel" id="checkout-phone" placeholder="10-digit mobile number" maxlength="10" style="flex:1;">
           <button type="button" class="btn btn-outline" id="checkout-send-otp-btn" style="white-space:nowrap;color:#0d1b2a;border-color:#0d1b2a;">Send OTP</button>
         </div>
         <div id="checkout-otp-row" style="display:none;margin-top:12px;">
-          <div style="display:flex;gap:10px;">
+          <div class="checkout-inline-row" style="display:flex;gap:10px;">
             <input type="text" id="checkout-otp" placeholder="6-digit OTP" maxlength="6" style="flex:1;">
             <button type="button" class="btn btn-dark" id="checkout-verify-otp-btn" style="white-space:nowrap;">Verify</button>
           </div>

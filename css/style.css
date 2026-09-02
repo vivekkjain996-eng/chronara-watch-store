@@ -403,10 +403,53 @@ footer.site-footer { background: var(--navy); color: #cfd8e3; padding: 60px 24px
 }
 
 @media (max-width: 680px) {
-  nav.main-nav { display: none; }
+  /* Header collapses to logo + actions on one row; the nav (toggled via JS setting
+     display:block) drops to its own full-width row below rather than squeezing into
+     the flex row next to the logo. */
+  .header-inner { flex-wrap: wrap; padding: 14px 16px; }
+  .logo { font-size: 18px; gap: 6px; }
+  .logo img { width: 26px; height: 26px; }
+  .header-actions { gap: 12px; }
+  nav.main-nav { display: none; order: 3; width: 100%; }
+  nav.main-nav ul { flex-direction: column; gap: 0; padding-top: 10px; }
+  nav.main-nav ul li { border-top: 1px solid var(--border); }
+  nav.main-nav a { display: block; padding: 12px 4px; }
   .nav-toggle { display: block; }
+
+  .hero { padding: 56px 20px; }
   .hero-inner { flex-direction: column; text-align: center; }
+  .hero-text h1 { font-size: 30px; }
   .hero-image { flex: 0 0 auto; width: 220px; }
+  .section { padding: 48px 20px; }
+  .section-title h2 { font-size: 25px; }
   .product-grid, .category-grid { grid-template-columns: 1fr 1fr; }
   .form-row-2 { grid-template-columns: 1fr; }
+
+  .form-card { padding: 22px; }
+  .checkout-inline-row { flex-direction: column; }
+  .checkout-inline-row button { width: 100%; }
+
+  .detail-actions { flex-direction: column; }
+  .detail-actions .btn { text-align: center; }
+
+  .cart-summary { max-width: none; margin-left: 0; }
+
+  /* Tables (customer cart + admin's Manage Watches / Promo Codes, which reuse this
+     class) become stacked cards instead of squeezing columns into a narrow viewport. */
+  .cart-table thead { display: none; }
+  .cart-table, .cart-table tbody, .cart-table tr, .cart-table td { display: block; width: 100%; }
+  .cart-table tr { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; padding: 12px; }
+  .cart-table td { border-bottom: none; padding: 6px 2px; }
+  .cart-table td[data-label]::before {
+    content: attr(data-label); display: block; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 2px;
+  }
+
+  .admin-tabs { flex-wrap: wrap; }
+}
+
+@media (max-width: 420px) {
+  .product-grid, .category-grid { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: 1fr; }
+  .trust-grid { grid-template-columns: 1fr; }
 }
