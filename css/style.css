@@ -353,12 +353,12 @@ nav.main-nav a:hover::after, nav.main-nav a.active::after { right: 0; }
 .product-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); border-color: var(--gold); }
 
 .product-thumb {
-  background: linear-gradient(160deg, #f3efe6, #fff);
-  padding: 26px;
+  background: #fff;
+  padding: 7px;
   overflow: hidden;
 }
-.product-thumb img { width: 100%; height: 190px; object-fit: contain; transition: transform .35s ease; }
-.product-card:hover .product-thumb img { transform: scale(1.07); }
+.product-thumb img { width: 100%; height: 230px; object-fit: cover; border-radius: 4px; transition: transform .35s ease; }
+.product-card:hover .product-thumb img { transform: scale(1.06); }
 
 .product-info { padding: 18px 18px 22px; flex: 1; display: flex; flex-direction: column; }
 .product-category { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--gold-dark); font-weight: 700; margin-bottom: 6px; }
