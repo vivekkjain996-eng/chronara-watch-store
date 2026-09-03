@@ -343,7 +343,11 @@ function initCheckoutPage() {
   function unlockCheckout(phone) {
     if (phoneInput) phoneInput.value = phone;
     if (restFieldset) restFieldset.disabled = false;
-    showPhoneStatus("✓ Phone verified", true);
+    // Once verified there's nothing left to do here - hide the phone/OTP inputs entirely
+    // instead of leaving them sitting there looking like they still need action.
+    const inputBlock = document.getElementById("checkout-phone-input-block");
+    if (inputBlock) inputBlock.style.display = "none";
+    showPhoneStatus(`✓ Logged in as ${phone}`, true);
     loadAvailablePromos();
   }
 
