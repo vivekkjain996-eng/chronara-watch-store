@@ -11,7 +11,10 @@ function productCardHTML(p) {
         <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
         <div class="strap">${p.strap} strap</div>
         <div class="product-price">${formatPrice(p.price)}</div>
-        <button class="btn btn-dark btn-block add-to-cart-btn" data-id="${p.id}">Add to Cart</button>
+        <div class="product-card-actions">
+          <button class="btn btn-outline add-to-cart-btn" data-id="${p.id}" style="color:#0d1b2a;border-color:#0d1b2a;">Add to Cart</button>
+          <button class="btn btn-dark buy-now-btn" data-id="${p.id}">Buy Now</button>
+        </div>
       </div>
     </div>`;
 }
@@ -23,6 +26,7 @@ function renderProducts(containerId, list) {
     ? list.map(productCardHTML).join("")
     : `<p style="grid-column:1/-1;text-align:center;color:#6b6b6b;padding:40px 0;">No watches match these filters.</p>`;
   wireAddToCartButtons(el);
+  wireBuyNowButtons(el);
 }
 
 function wireAddToCartButtons(scope) {
@@ -33,6 +37,17 @@ function wireAddToCartButtons(scope) {
       btn.textContent = "Added ✓";
       btn.disabled = true;
       setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1200);
+    });
+  });
+}
+
+// Buy Now = add this one item to the cart, then skip straight to checkout (whatever else is
+// already in the cart checks out alongside it, same as any other add-to-cart + checkout flow).
+function wireBuyNowButtons(scope) {
+  scope.querySelectorAll(".buy-now-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      addToCart(btn.dataset.id, 1);
+      window.location.href = "checkout.html";
     });
   });
 }
@@ -135,7 +150,8 @@ async function initProductDetailPage() {
         </div>
       </div>
       <div class="detail-actions">
-        <button class="btn btn-dark" id="detail-add-btn">Add to Cart</button>
+        <button class="btn btn-outline" id="detail-add-btn" style="color:#0d1b2a;border-color:#0d1b2a;">Add to Cart</button>
+        <button class="btn btn-dark" id="detail-buy-now-btn">Buy Now</button>
         <a class="btn btn-outline" style="color:#0d1b2a;border-color:#0d1b2a;" href="cart.html">View Cart</a>
       </div>
     </div>`;
@@ -164,6 +180,10 @@ async function initProductDetailPage() {
     addToCart(product.id, Number(qtyInput.value));
     e.target.textContent = "Added to Cart ✓";
     setTimeout(() => { e.target.textContent = "Add to Cart"; }, 1500);
+  });
+  document.getElementById("detail-buy-now-btn").addEventListener("click", () => {
+    addToCart(product.id, Number(qtyInput.value));
+    window.location.href = "checkout.html";
   });
 
   // Related products (same category, excluding current)

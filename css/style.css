@@ -288,6 +288,9 @@ nav.main-nav a:hover, nav.main-nav a.active { color: var(--gold-dark); }
 .product-info .strap { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
 .product-price { font-size: 18px; font-weight: 700; color: var(--navy); margin-top: auto; margin-bottom: 14px; }
 
+.product-card-actions { display: flex; gap: 8px; }
+.product-card-actions .btn { flex: 1; padding: 11px 8px; font-size: 11.5px; letter-spacing: .5px; text-align: center; }
+
 /* Shop layout with filters */
 .shop-layout {
   display: grid;
