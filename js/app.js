@@ -304,7 +304,14 @@ function initCheckoutPage() {
   const upiIdEl = document.getElementById("checkout-upi-id");
   const utrInput = document.getElementById("checkout-utr");
 
+  const codFeeRow = document.getElementById("checkout-cod-fee-row");
+  const codFeeEl = document.getElementById("checkout-cod-fee");
+  const codNote = document.getElementById("checkout-cod-note");
+  const COD_FEE_AMOUNT = 40;
+  const COD_FEE_THRESHOLD = 500;
+
   let currentDiscount = 0;
+  let codFee = 0;
 
   if (subtotalEl) subtotalEl.textContent = formatPrice(subtotal);
   if (shippingEl) shippingEl.textContent = shipping === 0 ? "Free" : formatPrice(shipping);
@@ -314,13 +321,31 @@ function initCheckoutPage() {
     currentDiscount = discount;
     if (discountRow) discountRow.style.display = discount > 0 ? "flex" : "none";
     if (discountEl) discountEl.textContent = "-" + formatPrice(discount);
-    const finalTotal = Math.max(0, subtotal - discount + shipping);
+    const finalTotal = Math.max(0, subtotal - discount + shipping + codFee);
     if (totalEl) totalEl.textContent = formatPrice(finalTotal);
     if (upiAmountEl) upiAmountEl.textContent = formatPrice(finalTotal);
   }
 
+  // Cash on Delivery carries a small handling fee below ₹500 - matches the server's
+  // authoritative calculation in server/routes/orders.js.
+  function updateCodFee() {
+    const isCOD = paymentSelect && paymentSelect.value === "Cash on Delivery";
+    codFee = isCOD && subtotal < COD_FEE_THRESHOLD ? COD_FEE_AMOUNT : 0;
+    if (codFeeRow) codFeeRow.style.display = codFee > 0 ? "flex" : "none";
+    if (codFeeEl) codFeeEl.textContent = formatPrice(codFee);
+    if (codNote) {
+      codNote.style.display = codFee > 0 ? "block" : "none";
+      if (codFee > 0) {
+        codNote.textContent = `Cash on Delivery has a ${formatPrice(COD_FEE_AMOUNT)} handling fee for orders below ${formatPrice(COD_FEE_THRESHOLD)}.`;
+      }
+    }
+    updateTotals(currentDiscount);
+  }
+  updateCodFee(); // Cash on Delivery is the default selected payment method
+
   if (paymentSelect) {
     paymentSelect.addEventListener("change", () => {
+      updateCodFee();
       if (paymentSelect.value !== "UPI") {
         upiSection.style.display = "none";
         return;
@@ -546,6 +571,7 @@ async function initOrdersPage() {
         <span class="order-total">
           ${order.discount > 0 ? `<span style="color:#2e7d32;font-weight:600;margin-right:8px;">${order.promoCode} applied (-${formatPrice(order.discount)})</span>` : ""}
           ${order.shipping > 0 ? `<span style="margin-right:8px;">Shipping: ${formatPrice(order.shipping)}</span>` : ""}
+          ${order.codFee > 0 ? `<span style="margin-right:8px;">COD Fee: ${formatPrice(order.codFee)}</span>` : ""}
           Total: ${formatPrice(order.total)}
         </span>
       </div>

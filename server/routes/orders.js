@@ -21,6 +21,7 @@ function rowToOrder(row) {
     total: row.total,
     discount: row.discount || 0,
     shipping: row.shipping || 0,
+    codFee: row.cod_fee || 0,
     promoCode: row.promo_code || null,
     phone: row.phone || null,
     utr: row.utr || null,
@@ -33,6 +34,59 @@ function rowToOrder(row) {
     payment: row.payment,
     status: row.status
   };
+}
+
+function money(n) { return "₹" + Number(n).toLocaleString("en-IN"); }
+
+// Full order details for the admin email alert - address, items, and the complete price
+// breakdown, not just the total, so admin can act on the email without needing to also open
+// the admin dashboard.
+function renderOrderAlertHtml(o) {
+  const itemRows = o.items.map((item) => `
+    <tr>
+      <td style="padding:6px 10px;border-bottom:1px solid #e5e0d8;">${item.name}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #e5e0d8;text-align:center;">${item.qty}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #e5e0d8;text-align:right;">${money(item.price * item.qty)}</td>
+    </tr>`).join("");
+
+  const summaryRow = (label, value) => value ? `
+    <tr><td style="padding:3px 0;color:#6b6b6b;">${label}</td><td style="padding:3px 0;text-align:right;">${value}</td></tr>` : "";
+
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:560px;">
+      <h2 style="margin:0 0 4px;">New UPI Payment to Verify</h2>
+      <p style="color:#6b6b6b;margin:0 0 18px;">Order #${o.orderId} &middot; ${new Date(o.date).toLocaleString("en-IN")}</p>
+
+      <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+        <tr><td style="padding:3px 0;color:#6b6b6b;width:140px;">Customer</td><td style="padding:3px 0;">${o.customerName || "-"}</td></tr>
+        <tr><td style="padding:3px 0;color:#6b6b6b;">Phone</td><td style="padding:3px 0;">${o.phone || "-"}</td></tr>
+        <tr><td style="padding:3px 0;color:#6b6b6b;">Email</td><td style="padding:3px 0;">${o.email || "-"}</td></tr>
+        <tr><td style="padding:3px 0;color:#6b6b6b;vertical-align:top;">Delivery Address</td><td style="padding:3px 0;">${o.address || ""}${o.address ? "," : ""} ${o.city || ""} ${o.pin || ""}</td></tr>
+        <tr><td style="padding:3px 0;color:#6b6b6b;">Payment Method</td><td style="padding:3px 0;">${o.payment || "-"}</td></tr>
+        <tr><td style="padding:3px 0;color:#6b6b6b;"><strong>UTR</strong></td><td style="padding:3px 0;"><strong>${o.utr}</strong></td></tr>
+      </table>
+
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+        <thead>
+          <tr style="background:#f5f3ef;">
+            <th style="padding:6px 10px;text-align:left;">Item</th>
+            <th style="padding:6px 10px;text-align:center;">Qty</th>
+            <th style="padding:6px 10px;text-align:right;">Price</th>
+          </tr>
+        </thead>
+        <tbody>${itemRows}</tbody>
+      </table>
+
+      <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+        <tr><td style="padding:3px 0;color:#6b6b6b;">Subtotal</td><td style="padding:3px 0;text-align:right;">${money(o.subtotal)}</td></tr>
+        ${summaryRow("Discount", o.discount > 0 ? "-" + money(o.discount) : "")}
+        ${summaryRow("Shipping", o.shipping > 0 ? money(o.shipping) : "Free")}
+        ${summaryRow("COD Fee", o.codFee > 0 ? money(o.codFee) : "")}
+        <tr><td style="padding:6px 0 0;font-weight:bold;border-top:1px solid #e5e0d8;">Total</td><td style="padding:6px 0 0;text-align:right;font-weight:bold;border-top:1px solid #e5e0d8;">${money(o.total)}</td></tr>
+      </table>
+
+      <p style="color:#6b6b6b;font-size:13px;">Check this UTR against your bank/UPI app, then mark the payment verified in the admin Orders tab.</p>
+    </div>`;
 }
 
 // Admin: every order, every customer, full details. Defined before "/" GET so it's
@@ -87,18 +141,22 @@ router.post("/", requireCustomer, asyncHandler(async (req, res) => {
   // pre-discount subtotal like the cart page already does.
   const shipping = subtotal >= 5000 ? 0 : 199;
 
+  // Cash on Delivery carries a small handling fee below ₹500, same subtotal basis as shipping.
+  const isCOD = payment === "Cash on Delivery";
+  const codFee = isCOD && subtotal < 500 ? 40 : 0;
+
   const orderId = generateOrderId();
   const date = new Date().toISOString();
-  const total = subtotal - discount + shipping;
+  const total = subtotal - discount + shipping + codFee;
 
   const isUpiWithUtr = payment === "UPI" && utr && String(utr).trim();
   const paymentStatus = isUpiWithUtr ? "Pending Verification" : "Not Required";
   const utrValue = isUpiWithUtr ? String(utr).trim() : null;
 
   await db.run(
-    `INSERT INTO orders (id, customer_id, date, items, total, promo_code, discount, shipping, phone, customer_name, email, city, pin, address, payment, status, utr, payment_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [orderId, customerId, date, JSON.stringify(items), total, appliedCode, discount, shipping, phone,
+    `INSERT INTO orders (id, customer_id, date, items, total, promo_code, discount, shipping, cod_fee, phone, customer_name, email, city, pin, address, payment, status, utr, payment_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [orderId, customerId, date, JSON.stringify(items), total, appliedCode, discount, shipping, codFee, phone,
       customerName || "", email || "", city || "", pin || "", address || "", payment || "", "Processing",
       utrValue, paymentStatus]
   );
@@ -106,10 +164,10 @@ router.post("/", requireCustomer, asyncHandler(async (req, res) => {
   if (isUpiWithUtr) {
     sendAdminAlert(
       `New UPI payment to verify - Order #${orderId}`,
-      `<p><strong>Order #${orderId}</strong> - ₹${total}</p>
-       <p>Customer: ${customerName || ""} (${phone})</p>
-       <p><strong>UTR: ${utrValue}</strong></p>
-       <p>Check this against your bank/UPI app, then mark it verified in the admin Orders tab.</p>`
+      renderOrderAlertHtml({
+        orderId, date, items, subtotal, discount, shipping, codFee, total,
+        customerName, email, phone, city, pin, address, payment, utr: utrValue
+      })
     ); // not awaited - an email failure shouldn't fail order placement
   }
 
