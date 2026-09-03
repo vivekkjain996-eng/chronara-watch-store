@@ -54,7 +54,7 @@ function renderOrderAlertHtml(o) {
 
   return `
     <div style="font-family:Arial,sans-serif;max-width:560px;">
-      <h2 style="margin:0 0 4px;">New UPI Payment to Verify</h2>
+      <h2 style="margin:0 0 4px;">${o.isCOD ? "New COD Order - Advance Payment to Verify" : "New UPI Payment to Verify"}</h2>
       <p style="color:#6b6b6b;margin:0 0 18px;">Order #${o.orderId} &middot; ${new Date(o.date).toLocaleString("en-IN")}</p>
 
       <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
@@ -81,8 +81,10 @@ function renderOrderAlertHtml(o) {
         <tr><td style="padding:3px 0;color:#6b6b6b;">Subtotal</td><td style="padding:3px 0;text-align:right;">${money(o.subtotal)}</td></tr>
         ${summaryRow("Discount", o.discount > 0 ? "-" + money(o.discount) : "")}
         ${summaryRow("Shipping", o.shipping > 0 ? money(o.shipping) : "Free")}
-        ${summaryRow("COD Fee", o.codFee > 0 ? money(o.codFee) : "")}
-        <tr><td style="padding:6px 0 0;font-weight:bold;border-top:1px solid #e5e0d8;">Total</td><td style="padding:6px 0 0;text-align:right;font-weight:bold;border-top:1px solid #e5e0d8;">${money(o.total)}</td></tr>
+        <tr><td style="padding:6px 0 0;font-weight:bold;border-top:1px solid #e5e0d8;">Order Total</td><td style="padding:6px 0 0;text-align:right;font-weight:bold;border-top:1px solid #e5e0d8;">${money(o.total)}</td></tr>
+        ${o.isCOD ? `
+        <tr><td style="padding:8px 0 0;color:#2e7d32;font-weight:bold;">Advance paid now (UPI)</td><td style="padding:8px 0 0;text-align:right;color:#2e7d32;font-weight:bold;">${money(o.advanceAmount)}</td></tr>
+        <tr><td style="padding:3px 0;color:#b8941f;font-weight:bold;">Amount due on delivery</td><td style="padding:3px 0;text-align:right;color:#b8941f;font-weight:bold;">${money(o.total - o.advanceAmount)}</td></tr>` : ""}
       </table>
 
       <p style="color:#6b6b6b;font-size:13px;">Check this UTR against your bank/UPI app, then mark the payment verified in the admin Orders tab.</p>
@@ -137,35 +139,43 @@ router.post("/", requireCustomer, asyncHandler(async (req, res) => {
   }
 
   // Free shipping at/above ₹5,000 subtotal (matches the threshold already advertised on the
-  // site and used for the cart page's shipping display), else a flat ₹199 - checked against
+  // site and used for the cart page's shipping display), else a flat ₹200 - checked against
   // pre-discount subtotal like the cart page already does.
-  const shipping = subtotal >= 5000 ? 0 : 199;
+  const shipping = subtotal >= 5000 ? 0 : 200;
 
-  // Cash on Delivery carries a small handling fee below ₹500, same subtotal basis as shipping.
+  // Cash on Delivery requires a small UPI advance upfront (anti-fraud pattern) - ₹50 for small
+  // orders, ₹200 for larger ones. This is a *prepayment*, not an added fee: it's already part of
+  // `total` below, not added on top. The remainder (total - advanceAmount) is collected as cash
+  // at delivery. Unlike full-UPI orders (still lenient - see isUpiWithUtr below), a COD order
+  // without an advance UTR is rejected outright, since the whole point is to require it upfront.
   const isCOD = payment === "Cash on Delivery";
-  const codFee = isCOD && subtotal < 500 ? 40 : 0;
+  const advanceAmount = isCOD ? (subtotal < 500 ? 50 : 200) : 0;
+  const utrValue = utr && String(utr).trim() ? String(utr).trim() : null;
+
+  if (isCOD && !utrValue) {
+    return res.status(400).json({ error: "COD requires a small UPI advance payment - pay via the QR code shown and enter the UTR." });
+  }
 
   const orderId = generateOrderId();
   const date = new Date().toISOString();
-  const total = subtotal - discount + shipping + codFee;
+  const total = subtotal - discount + shipping;
 
-  const isUpiWithUtr = payment === "UPI" && utr && String(utr).trim();
-  const paymentStatus = isUpiWithUtr ? "Pending Verification" : "Not Required";
-  const utrValue = isUpiWithUtr ? String(utr).trim() : null;
+  const isUpiWithUtr = payment === "UPI" && utrValue;
+  const paymentStatus = (isCOD || isUpiWithUtr) ? "Pending Verification" : "Not Required";
 
   await db.run(
     `INSERT INTO orders (id, customer_id, date, items, total, promo_code, discount, shipping, cod_fee, phone, customer_name, email, city, pin, address, payment, status, utr, payment_status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [orderId, customerId, date, JSON.stringify(items), total, appliedCode, discount, shipping, codFee, phone,
+    [orderId, customerId, date, JSON.stringify(items), total, appliedCode, discount, shipping, advanceAmount, phone,
       customerName || "", email || "", city || "", pin || "", address || "", payment || "", "Processing",
       utrValue, paymentStatus]
   );
 
-  if (isUpiWithUtr) {
+  if (isCOD || isUpiWithUtr) {
     sendAdminAlert(
-      `New UPI payment to verify - Order #${orderId}`,
+      isCOD ? `New COD order - advance to verify - Order #${orderId}` : `New UPI payment to verify - Order #${orderId}`,
       renderOrderAlertHtml({
-        orderId, date, items, subtotal, discount, shipping, codFee, total,
+        orderId, date, items, subtotal, discount, shipping, total, isCOD, advanceAmount,
         customerName, email, phone, city, pin, address, payment, utr: utrValue
       })
     ); // not awaited - an email failure shouldn't fail order placement

@@ -82,7 +82,6 @@
             <option>Card (demo — not processed)</option>
             <option value="UPI">UPI</option>
           </select>
-          <p id="checkout-cod-note" style="font-size:11.5px;color:#6b6b6b;margin-top:6px;display:none;"></p>
         </div>
         <div class="form-row" id="checkout-upi-section" style="display:none;">
           <div style="text-align:center;background:var(--cream);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
@@ -93,6 +92,23 @@
           <label style="margin-top:14px;display:block;">UTR / UPI Reference Number</label>
           <input type="text" id="checkout-utr" placeholder="12-digit UTR from your payment app">
           <p style="font-size:11.5px;color:#6b6b6b;margin-top:6px;">After paying, enter the UTR shown in your UPI app's transaction history — this is used to verify your payment. Your order will show as "Pending Verification" until confirmed.</p>
+        </div>
+        <div class="form-row" id="checkout-cod-section" style="display:none;">
+          <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">Cash on Delivery requires a small advance payment via UPI to confirm your order — the rest is collected in cash when it's delivered.</p>
+          <div style="text-align:center;background:var(--cream);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+            <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Pay <strong id="checkout-cod-advance-amount">₹0</strong> now via any UPI app</p>
+            <img id="checkout-cod-qr" src="" alt="UPI QR code" style="max-width:180px;margin:0 auto 10px;display:none;">
+            <p id="checkout-cod-upi-id" style="font-weight:600;font-size:14px;"></p>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:12px;">
+            <span>Pay now via UPI</span><strong id="checkout-cod-advance-line">₹0</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:4px;color:var(--muted);">
+            <span>Amount due on delivery</span><strong id="checkout-cod-due-line">₹0</strong>
+          </div>
+          <label style="margin-top:14px;display:block;">UTR / UPI Reference Number</label>
+          <input type="text" id="checkout-cod-utr" placeholder="12-digit UTR from your payment app">
+          <p style="font-size:11.5px;color:#6b6b6b;margin-top:6px;">After paying the advance, enter the UTR shown in your UPI app's transaction history — your order won't be placed until this is submitted.</p>
         </div>
         <div class="form-row">
           <label>Promo Code</label>
@@ -110,9 +126,6 @@
           </div>
           <div style="display:flex;justify-content:space-between;font-size:14px;color:var(--muted);margin-bottom:6px;">
             <span>Shipping</span><span id="checkout-shipping">Free</span>
-          </div>
-          <div id="checkout-cod-fee-row" style="display:none;justify-content:space-between;font-size:14px;color:var(--muted);margin-bottom:6px;">
-            <span>COD Handling Fee</span><span id="checkout-cod-fee">₹0</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;">
             <span>Order Total</span><span id="checkout-total">₹0</span>

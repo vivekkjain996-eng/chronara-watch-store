@@ -568,7 +568,7 @@ async function renderOrdersTab() {
         ${order.paymentStatus === "Pending Verification" ? `<button type="button" class="btn btn-dark admin-verify-payment-btn" data-id="${order.id}" style="padding:6px 14px;font-size:11.5px;">Verify Payment</button>` : ""}
       </div>` : ""}
       <div class="order-card-foot">
-        <span>${order.discount > 0 ? `Promo: ${order.promoCode} (-${formatPrice(order.discount)})` : ""}${order.shipping > 0 ? ` &nbsp;|&nbsp; Shipping: ${formatPrice(order.shipping)}` : ""}${order.codFee > 0 ? ` &nbsp;|&nbsp; COD Fee: ${formatPrice(order.codFee)}` : ""}</span>
+        <span>${order.discount > 0 ? `Promo: ${order.promoCode} (-${formatPrice(order.discount)})` : ""}${order.shipping > 0 ? ` &nbsp;|&nbsp; Shipping: ${formatPrice(order.shipping)}` : ""}${order.codFee > 0 ? ` &nbsp;|&nbsp; Advance Paid (UPI): ${formatPrice(order.codFee)} &nbsp;|&nbsp; Due on Delivery: ${formatPrice(order.total - order.codFee)}` : ""}</span>
         <span class="order-total">Total: ${formatPrice(order.total)}</span>
       </div>
     </div>`;

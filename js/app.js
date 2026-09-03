@@ -233,7 +233,8 @@ function initCartPage() {
     }).join("");
 
     const total = cartTotal();
-    const shipping = total > 5000 || total === 0 ? 0 : 199;
+    // Matches the server's authoritative calc (server/routes/orders.js) and checkout's display.
+    const shipping = total === 0 || total >= 5000 ? 0 : 200;
 
     root.innerHTML = `
       <table class="cart-table">
@@ -280,9 +281,9 @@ function initCheckoutPage() {
   if (!form) return;
 
   const subtotal = cartTotal();
-  // Free at/above ₹5,000, else a flat ₹199 - matches cart.html's existing display and the
+  // Free at/above ₹5,000, else a flat ₹200 - matches cart.html's existing display and the
   // server's authoritative calculation in server/routes/orders.js.
-  const shipping = subtotal >= 5000 ? 0 : 199;
+  const shipping = subtotal >= 5000 ? 0 : 200;
   const subtotalEl = document.getElementById("checkout-subtotal");
   const shippingEl = document.getElementById("checkout-shipping");
   const totalEl = document.getElementById("checkout-total");
@@ -304,64 +305,73 @@ function initCheckoutPage() {
   const upiIdEl = document.getElementById("checkout-upi-id");
   const utrInput = document.getElementById("checkout-utr");
 
-  const codFeeRow = document.getElementById("checkout-cod-fee-row");
-  const codFeeEl = document.getElementById("checkout-cod-fee");
-  const codNote = document.getElementById("checkout-cod-note");
-  const COD_FEE_AMOUNT = 40;
-  const COD_FEE_THRESHOLD = 500;
+  // Cash on Delivery requires a small UPI advance upfront (anti-fraud) - a prepayment that's
+  // already part of the total, not an added fee. Fixed for this checkout session (based on the
+  // cart's subtotal, which doesn't change with the promo discount).
+  const codSection = document.getElementById("checkout-cod-section");
+  const codAdvanceAmountEl = document.getElementById("checkout-cod-advance-amount");
+  const codQrImg = document.getElementById("checkout-cod-qr");
+  const codUpiIdEl = document.getElementById("checkout-cod-upi-id");
+  const codAdvanceLineEl = document.getElementById("checkout-cod-advance-line");
+  const codDueLineEl = document.getElementById("checkout-cod-due-line");
+  const codUtrInput = document.getElementById("checkout-cod-utr");
+  const advanceAmount = subtotal < 500 ? 50 : 200;
 
   let currentDiscount = 0;
-  let codFee = 0;
 
   if (subtotalEl) subtotalEl.textContent = formatPrice(subtotal);
   if (shippingEl) shippingEl.textContent = shipping === 0 ? "Free" : formatPrice(shipping);
   if (totalEl) totalEl.textContent = formatPrice(subtotal + shipping);
 
+  function currentFinalTotal() {
+    return Math.max(0, subtotal - currentDiscount + shipping);
+  }
+
+  function updateCodAmounts() {
+    const due = Math.max(0, currentFinalTotal() - advanceAmount);
+    if (codAdvanceAmountEl) codAdvanceAmountEl.textContent = formatPrice(advanceAmount);
+    if (codAdvanceLineEl) codAdvanceLineEl.textContent = formatPrice(advanceAmount);
+    if (codDueLineEl) codDueLineEl.textContent = formatPrice(due);
+  }
+
   function updateTotals(discount) {
     currentDiscount = discount;
     if (discountRow) discountRow.style.display = discount > 0 ? "flex" : "none";
     if (discountEl) discountEl.textContent = "-" + formatPrice(discount);
-    const finalTotal = Math.max(0, subtotal - discount + shipping + codFee);
+    const finalTotal = currentFinalTotal();
     if (totalEl) totalEl.textContent = formatPrice(finalTotal);
     if (upiAmountEl) upiAmountEl.textContent = formatPrice(finalTotal);
+    updateCodAmounts();
   }
 
-  // Cash on Delivery carries a small handling fee below ₹500 - matches the server's
-  // authoritative calculation in server/routes/orders.js.
-  function updateCodFee() {
-    const isCOD = paymentSelect && paymentSelect.value === "Cash on Delivery";
-    codFee = isCOD && subtotal < COD_FEE_THRESHOLD ? COD_FEE_AMOUNT : 0;
-    if (codFeeRow) codFeeRow.style.display = codFee > 0 ? "flex" : "none";
-    if (codFeeEl) codFeeEl.textContent = formatPrice(codFee);
-    if (codNote) {
-      codNote.style.display = codFee > 0 ? "block" : "none";
-      if (codFee > 0) {
-        codNote.textContent = `Cash on Delivery has a ${formatPrice(COD_FEE_AMOUNT)} handling fee for orders below ${formatPrice(COD_FEE_THRESHOLD)}.`;
+  function loadUpiQr(qrImgEl, idEl) {
+    getPaymentSettings().then((settings) => {
+      if (settings.qr_code_url) {
+        qrImgEl.src = settings.qr_code_url;
+        qrImgEl.style.display = "block";
       }
-    }
-    updateTotals(currentDiscount);
+      idEl.textContent = settings.upi_id ? `UPI ID: ${settings.upi_id}` : "";
+    }).catch(() => {
+      idEl.textContent = "Couldn't load payment details - try refreshing.";
+    });
   }
-  updateCodFee(); // Cash on Delivery is the default selected payment method
+
+  function updatePaymentSections() {
+    const method = paymentSelect.value;
+    if (codSection) codSection.style.display = method === "Cash on Delivery" ? "block" : "none";
+    if (upiSection) upiSection.style.display = method === "UPI" ? "block" : "none";
+    if (method === "Cash on Delivery") {
+      updateCodAmounts();
+      loadUpiQr(codQrImg, codUpiIdEl);
+    } else if (method === "UPI") {
+      upiAmountEl.textContent = formatPrice(currentFinalTotal());
+      loadUpiQr(upiQrImg, upiIdEl);
+    }
+  }
+  updatePaymentSections(); // Cash on Delivery is the default selected payment method
 
   if (paymentSelect) {
-    paymentSelect.addEventListener("change", () => {
-      updateCodFee();
-      if (paymentSelect.value !== "UPI") {
-        upiSection.style.display = "none";
-        return;
-      }
-      upiSection.style.display = "block";
-      upiAmountEl.textContent = formatPrice(Math.max(0, subtotal - currentDiscount + shipping));
-      getPaymentSettings().then((settings) => {
-        if (settings.qr_code_url) {
-          upiQrImg.src = settings.qr_code_url;
-          upiQrImg.style.display = "block";
-        }
-        upiIdEl.textContent = settings.upi_id ? `UPI ID: ${settings.upi_id}` : "";
-      }).catch(() => {
-        upiIdEl.textContent = "Couldn't load payment details - try refreshing.";
-      });
-    });
+    paymentSelect.addEventListener("change", updatePaymentSections);
   }
 
   function showPromoMessage(text, ok) {
@@ -479,6 +489,10 @@ function initCheckoutPage() {
       alert("Enter the UTR from your UPI app after paying.");
       return;
     }
+    if (paymentSelect.value === "Cash on Delivery" && !(codUtrInput.value || "").trim()) {
+      alert(`Pay the ${formatPrice(advanceAmount)} advance via UPI and enter the UTR to confirm your COD order.`);
+      return;
+    }
 
     const submitBtn = form.querySelector("button[type=submit]");
     submitBtn.disabled = true;
@@ -493,7 +507,9 @@ function initCheckoutPage() {
         pin: document.getElementById("checkout-pin").value,
         address: document.getElementById("checkout-address").value,
         payment: paymentSelect.value,
-        utr: paymentSelect.value === "UPI" ? utrInput.value.trim() : undefined
+        utr: paymentSelect.value === "UPI" ? utrInput.value.trim()
+          : paymentSelect.value === "Cash on Delivery" ? codUtrInput.value.trim()
+          : undefined
       });
 
       saveCart([]); // clear cart - demo order "placed"
@@ -571,7 +587,7 @@ async function initOrdersPage() {
         <span class="order-total">
           ${order.discount > 0 ? `<span style="color:#2e7d32;font-weight:600;margin-right:8px;">${order.promoCode} applied (-${formatPrice(order.discount)})</span>` : ""}
           ${order.shipping > 0 ? `<span style="margin-right:8px;">Shipping: ${formatPrice(order.shipping)}</span>` : ""}
-          ${order.codFee > 0 ? `<span style="margin-right:8px;">COD Fee: ${formatPrice(order.codFee)}</span>` : ""}
+          ${order.codFee > 0 ? `<span style="margin-right:8px;">Advance Paid (UPI): ${formatPrice(order.codFee)} &middot; Due on Delivery: ${formatPrice(order.total - order.codFee)}</span>` : ""}
           Total: ${formatPrice(order.total)}
         </span>
       </div>
