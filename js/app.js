@@ -1,6 +1,19 @@
 // Shared UI logic: rendering product cards, filters, product detail, cart page.
 
+// Renders a row of 5 stars, gold-filled up to the rounded rating, muted for the rest.
+function starRatingHTML(rating) {
+  const rounded = Math.round(Number(rating) || 0);
+  let html = "";
+  for (let i = 1; i <= 5; i++) {
+    html += i <= rounded ? "★" : `<span class="star-empty">★</span>`;
+  }
+  return `<span class="star-rating">${html}</span>`;
+}
+
 function productCardHTML(p) {
+  const ratingRow = p.reviewCount > 0
+    ? `<div class="product-rating">${starRatingHTML(p.avgRating)} <span>(${p.reviewCount})</span></div>`
+    : "";
   return `
     <div class="product-card">
       <a href="product.html?id=${p.id}">
@@ -10,6 +23,7 @@ function productCardHTML(p) {
         <span class="product-category">${p.category}</span>
         <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
         <div class="strap">${p.strap} strap</div>
+        ${ratingRow}
         <div class="product-price">${formatPrice(p.price)}</div>
         <div class="product-card-actions">
           <button class="btn btn-outline add-to-cart-btn" data-id="${p.id}" style="color:#0d1b2a;border-color:#0d1b2a;">Add to Cart</button>
@@ -191,6 +205,129 @@ async function initProductDetailPage() {
   if (related.length) {
     renderProducts("related-grid", related);
   }
+
+  renderReviewsSection(product.id);
+}
+
+/* ---------- Reviews (product detail page) ---------- */
+function formatReviewDate(isoString) {
+  return new Date(isoString).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+async function renderReviewsSection(productId) {
+  const root = document.getElementById("reviews-root");
+  if (!root) return;
+
+  let data;
+  try {
+    data = await apiGet(`/api/reviews/${productId}`);
+  } catch (err) {
+    root.innerHTML = `<p style="color:#a6262b;">Couldn't load reviews: ${err.message}</p>`;
+    return;
+  }
+
+  const summaryHTML = `
+    <div class="reviews-summary">
+      <div class="reviews-average">${data.count ? data.average.toFixed(1) : "–"}</div>
+      <div class="reviews-average-meta">
+        ${starRatingHTML(data.average)}
+        <span class="reviews-count">${data.count} review${data.count === 1 ? "" : "s"}</span>
+      </div>
+    </div>`;
+
+  const listHTML = data.reviews.length
+    ? data.reviews.map(r => `
+      <div class="review-card">
+        <div class="review-card-head">
+          <span class="review-card-name">${r.customerName}</span>
+          <span class="review-card-date">${formatReviewDate(r.date)}</span>
+        </div>
+        ${starRatingHTML(r.rating)}
+        ${r.comment ? `<p class="review-card-comment">${r.comment}</p>` : ""}
+      </div>`).join("")
+    : `<p style="color:#6b6b6b;">No reviews yet — be the first to review this watch.</p>`;
+
+  root.innerHTML = summaryHTML + listHTML + `<div id="review-form-slot"></div>`;
+
+  renderReviewForm(productId);
+}
+
+async function renderReviewForm(productId) {
+  const slot = document.getElementById("review-form-slot");
+  if (!slot) return;
+
+  if (!isPhoneVerified()) {
+    slot.innerHTML = `<p style="margin-top:22px;font-size:13.5px;color:#6b6b6b;"><a href="login.html?redirect=${encodeURIComponent("product.html?id=" + productId)}" style="color:var(--gold-dark);font-weight:600;">Log in</a> to write a review if you've purchased this watch.</p>`;
+    return;
+  }
+
+  let mine;
+  try {
+    mine = await apiGet(`/api/reviews/${productId}/mine`);
+  } catch (err) {
+    return; // Quietly skip the form if this lookup fails - reviews list above still works.
+  }
+
+  if (!mine.canReview) {
+    slot.innerHTML = `<p style="margin-top:22px;font-size:13.5px;color:#6b6b6b;">Only customers who've purchased this watch can leave a review.</p>`;
+    return;
+  }
+
+  const existing = mine.review;
+  let selectedRating = existing ? existing.rating : 0;
+
+  slot.innerHTML = `
+    <div class="review-form-card">
+      <h3 style="margin-bottom:16px;">${existing ? "Update Your Review" : "Write a Review"}</h3>
+      <form id="review-form">
+        <div class="star-picker" id="review-star-picker">
+          ${[1, 2, 3, 4, 5].map(n => `<button type="button" data-value="${n}">★</button>`).join("")}
+        </div>
+        <div class="form-row">
+          <textarea id="review-comment" rows="3" placeholder="Share your experience with this watch (optional)">${existing ? existing.comment : ""}</textarea>
+        </div>
+        <p id="review-error" style="color:#a6262b;font-size:13px;margin-bottom:12px;display:none;"></p>
+        <button type="submit" class="btn btn-dark">${existing ? "Update Review" : "Submit Review"}</button>
+      </form>
+    </div>`;
+
+  const picker = document.getElementById("review-star-picker");
+  function paintStars() {
+    picker.querySelectorAll("button").forEach(btn => {
+      btn.classList.toggle("active", Number(btn.dataset.value) <= selectedRating);
+    });
+  }
+  picker.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedRating = Number(btn.dataset.value);
+      paintStars();
+    });
+  });
+  paintStars();
+
+  document.getElementById("review-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("review-error");
+    errorEl.style.display = "none";
+    if (!selectedRating) {
+      errorEl.textContent = "Select a star rating before submitting.";
+      errorEl.style.display = "block";
+      return;
+    }
+    const submitBtn = e.target.querySelector("button[type=submit]");
+    submitBtn.disabled = true;
+    try {
+      await apiPost(`/api/reviews/${productId}`, {
+        rating: selectedRating,
+        comment: document.getElementById("review-comment").value
+      });
+      renderReviewsSection(productId);
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = "block";
+      submitBtn.disabled = false;
+    }
+  });
 }
 
 /* ---------- Cart page ---------- */

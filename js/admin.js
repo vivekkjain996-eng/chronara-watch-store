@@ -66,7 +66,8 @@ const ADMIN_TABS = [
   { key: "products", label: "Manage Watches", render: () => renderProductsTab() },
   { key: "orders", label: "Orders", render: () => renderOrdersTab() },
   { key: "promos", label: "Promo Codes", render: () => renderPromosTab() },
-  { key: "payment", label: "Payment Settings", render: () => renderPaymentSettingsTab() }
+  { key: "payment", label: "Payment Settings", render: () => renderPaymentSettingsTab() },
+  { key: "reviews", label: "Reviews", render: () => renderReviewsTab() }
 ];
 
 async function renderDashboard(root) {
@@ -595,6 +596,59 @@ async function renderOrdersTab() {
         renderOrdersTab();
       } catch (err) {
         alert("Couldn't verify payment: " + err.message);
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+/* ---------- Reviews tab ---------- */
+function adminStarsHTML(rating) {
+  let html = "";
+  for (let i = 1; i <= 5; i++) html += i <= rating ? "★" : `<span style="color:var(--border);">★</span>`;
+  return `<span style="color:var(--gold);letter-spacing:1px;">${html}</span>`;
+}
+
+async function renderReviewsTab() {
+  const content = document.getElementById("admin-tab-content");
+  content.innerHTML = `<p style="color:#6b6b6b;">Loading reviews…</p>`;
+
+  let reviews;
+  try {
+    reviews = await apiGet("/api/reviews/admin/all");
+  } catch (err) {
+    content.innerHTML = `<p style="color:#a6262b;">Couldn't load reviews: ${err.message}</p>`;
+    return;
+  }
+
+  if (!reviews.length) {
+    content.innerHTML = `<div class="empty-state"><h3>No reviews yet</h3><p>Reviews left by customers on their purchased watches will show up here.</p></div>`;
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="admin-table-wrap">
+      ${reviews.map(r => `
+        <div class="review-card">
+          <div class="review-card-head">
+            <span class="review-card-name">${r.productName} &nbsp;&middot;&nbsp; ${r.customerName}</span>
+            <span class="review-card-date">${new Date(r.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+          </div>
+          ${adminStarsHTML(r.rating)}
+          ${r.comment ? `<p class="review-card-comment">${r.comment}</p>` : ""}
+          <button type="button" class="btn admin-delete-review-btn" data-id="${r.id}" style="margin-top:10px;padding:5px 12px;font-size:11px;color:#a6262b;border-color:#a6262b;">Delete Review</button>
+        </div>`).join("")}
+    </div>`;
+
+  content.querySelectorAll(".admin-delete-review-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this review? This can't be undone.")) return;
+      btn.disabled = true;
+      try {
+        await apiDelete(`/api/reviews/admin/${btn.dataset.id}`);
+        renderReviewsTab();
+      } catch (err) {
+        alert("Couldn't delete review: " + err.message);
         btn.disabled = false;
       }
     });

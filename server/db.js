@@ -122,6 +122,18 @@ const SCHEMA_STATEMENTS = [
     upi_id TEXT,
     qr_code_url TEXT,
     qr_code_public_id TEXT
+  )`,
+  // One review per (product, phone) - a repeat review from the same customer overwrites
+  // their previous one (see server/routes/reviews.js) rather than piling up duplicates.
+  `CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    phone TEXT NOT NULL,
+    customer_name TEXT,
+    rating INTEGER NOT NULL,
+    comment TEXT,
+    date TEXT NOT NULL,
+    UNIQUE(product_id, phone)
   )`
 ];
 

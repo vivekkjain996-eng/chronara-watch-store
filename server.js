@@ -11,6 +11,7 @@ const adminAuthRouter = require("./server/routes/admin");
 const promosRouter = require("./server/routes/promos");
 const customerAuthRouter = require("./server/routes/auth");
 const paymentRouter = require("./server/routes/payment");
+const reviewsRouter = require("./server/routes/reviews");
 
 const app = express();
 const port = process.env.PORT || 8899;
@@ -36,6 +37,7 @@ app.use("/api/admin", adminAuthRouter);
 app.use("/api/promos", promosRouter);
 app.use("/api/auth", customerAuthRouter);
 app.use("/api/payment-settings", paymentRouter);
+app.use("/api/reviews", reviewsRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

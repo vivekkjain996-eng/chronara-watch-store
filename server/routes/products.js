@@ -87,7 +87,15 @@ async function insertMedia(productId, imageFiles, labels, videoFile) {
 }
 
 router.get("/", asyncHandler(async (req, res) => {
-  const products = await db.all("SELECT * FROM products ORDER BY id");
+  const products = await db.all(
+    `SELECT p.*, COALESCE(r.avgRating, 0) AS avgRating, COALESCE(r.reviewCount, 0) AS reviewCount
+     FROM products p
+     LEFT JOIN (
+       SELECT product_id, AVG(rating) AS avgRating, COUNT(*) AS reviewCount
+       FROM reviews GROUP BY product_id
+     ) r ON r.product_id = p.id
+     ORDER BY p.id`
+  );
   res.json(products);
 }));
 
