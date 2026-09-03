@@ -475,7 +475,21 @@ function initCheckoutPage() {
       sessionStorage.setItem("chronara_last_order", order.id);
       window.location.href = "order-confirmation.html";
     } catch (err) {
-      alert("Couldn't place order: " + err.message);
+      if (err.message === "Phone verification required") {
+        // The stored login token exists but the server rejected it (most commonly: the
+        // server restarted and, without a stable JWT_SECRET configured, issued a fresh one -
+        // every previously-issued token silently stops working). Don't just alert a confusing
+        // message - clear the dead token and put the verification UI back so they can recover
+        // in one click instead of wondering why a page that said "Logged in" won't let them order.
+        logout();
+        const inputBlock = document.getElementById("checkout-phone-input-block");
+        if (inputBlock) inputBlock.style.display = "block";
+        if (restFieldset) restFieldset.disabled = true;
+        showPhoneStatus("Your login session expired - please verify your phone again to place the order.", false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        alert("Couldn't place order: " + err.message);
+      }
       submitBtn.disabled = false;
     }
   });

@@ -14,11 +14,20 @@ const TOKEN_TTL = "12h";
 // generate and put in .env) or from the plaintext DEFAULT_ADMIN_PASSWORD for local dev.
 const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
 
-if (!process.env.JWT_SECRET || !process.env.ADMIN_PASSWORD_HASH) {
+// Reported independently - conflating them into one message previously made it look like the
+// JWT secret was still random even after JWT_SECRET was correctly set, just because
+// ADMIN_PASSWORD_HASH (a separate, intentionally-still-default value) was also unset.
+if (!process.env.JWT_SECRET) {
   console.log(
-    "[auth] Running with local-dev defaults (admin password: 'admin123', in-memory JWT secret). " +
-    "Set ADMIN_PASSWORD_HASH and JWT_SECRET in .env before deploying anywhere real."
+    "[auth] JWT_SECRET not set - using a random in-memory secret. Every login token becomes " +
+    "invalid whenever this process restarts (every redeploy, every free-tier spin-down/wake-up). " +
+    "Set JWT_SECRET in .env for stable sessions."
   );
+} else {
+  console.log("[auth] JWT_SECRET is set - login sessions stay valid across restarts.");
+}
+if (!process.env.ADMIN_PASSWORD_HASH) {
+  console.log("[auth] ADMIN_PASSWORD_HASH not set - using the default demo admin password ('admin123').");
 }
 
 function checkAdminPassword(password) {
