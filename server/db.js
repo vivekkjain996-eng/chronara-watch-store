@@ -186,6 +186,7 @@ async function init() {
   await ensureColumn("orders", "phone", "TEXT");
   await ensureColumn("orders", "utr", "TEXT");
   await ensureColumn("orders", "payment_status", "TEXT NOT NULL DEFAULT 'Not Required'");
+  await ensureColumn("orders", "shipping", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn("product_media", "public_id", "TEXT");
   await seedProductsIfEmpty();
 }

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <rect x="170" y="10" width="60" height="90" rx="10" fill="none" stroke="#c9c9c9" stroke-width="3" stroke-dasharray="6 6"/>
+  <rect x="170" y="300" width="60" height="90" rx="10" fill="none" stroke="#c9c9c9" stroke-width="3" stroke-dasharray="6 6"/>
+  <circle cx="200" cy="200" r="120" fill="#f4f4f4" stroke="#c9c9c9" stroke-width="3" stroke-dasharray="8 8"/>
+  <g fill="none" stroke="#b3b3b3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="160" y="175" width="80" height="55" rx="6"/>
+    <circle cx="200" cy="203" r="18"/>
+    <path d="M180 175 l8 -16 h24 l8 16"/>
+  </g>
+  <text x="200" y="270" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#999999">Photo coming soon</text>
+</svg>

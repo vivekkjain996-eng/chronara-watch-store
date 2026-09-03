@@ -20,6 +20,7 @@ function rowToOrder(row) {
     items: JSON.parse(row.items),
     total: row.total,
     discount: row.discount || 0,
+    shipping: row.shipping || 0,
     promoCode: row.promo_code || null,
     phone: row.phone || null,
     utr: row.utr || null,
@@ -81,18 +82,23 @@ router.post("/", requireCustomer, asyncHandler(async (req, res) => {
     // An invalid/expired code at submit time doesn't fail the order - it's just not applied.
   }
 
+  // Free shipping at/above ₹5,000 subtotal (matches the threshold already advertised on the
+  // site and used for the cart page's shipping display), else a flat ₹199 - checked against
+  // pre-discount subtotal like the cart page already does.
+  const shipping = subtotal >= 5000 ? 0 : 199;
+
   const orderId = generateOrderId();
   const date = new Date().toISOString();
-  const total = subtotal - discount;
+  const total = subtotal - discount + shipping;
 
   const isUpiWithUtr = payment === "UPI" && utr && String(utr).trim();
   const paymentStatus = isUpiWithUtr ? "Pending Verification" : "Not Required";
   const utrValue = isUpiWithUtr ? String(utr).trim() : null;
 
   await db.run(
-    `INSERT INTO orders (id, customer_id, date, items, total, promo_code, discount, phone, customer_name, email, city, pin, address, payment, status, utr, payment_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [orderId, customerId, date, JSON.stringify(items), total, appliedCode, discount, phone,
+    `INSERT INTO orders (id, customer_id, date, items, total, promo_code, discount, shipping, phone, customer_name, email, city, pin, address, payment, status, utr, payment_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [orderId, customerId, date, JSON.stringify(items), total, appliedCode, discount, shipping, phone,
       customerName || "", email || "", city || "", pin || "", address || "", payment || "", "Processing",
       utrValue, paymentStatus]
   );

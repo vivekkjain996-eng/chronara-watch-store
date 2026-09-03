@@ -260,7 +260,11 @@ function initCheckoutPage() {
   if (!form) return;
 
   const subtotal = cartTotal();
+  // Free at/above ₹5,000, else a flat ₹199 - matches cart.html's existing display and the
+  // server's authoritative calculation in server/routes/orders.js.
+  const shipping = subtotal >= 5000 ? 0 : 199;
   const subtotalEl = document.getElementById("checkout-subtotal");
+  const shippingEl = document.getElementById("checkout-shipping");
   const totalEl = document.getElementById("checkout-total");
   const discountRow = document.getElementById("checkout-discount-row");
   const discountEl = document.getElementById("checkout-discount");
@@ -283,13 +287,14 @@ function initCheckoutPage() {
   let currentDiscount = 0;
 
   if (subtotalEl) subtotalEl.textContent = formatPrice(subtotal);
-  if (totalEl) totalEl.textContent = formatPrice(subtotal);
+  if (shippingEl) shippingEl.textContent = shipping === 0 ? "Free" : formatPrice(shipping);
+  if (totalEl) totalEl.textContent = formatPrice(subtotal + shipping);
 
   function updateTotals(discount) {
     currentDiscount = discount;
     if (discountRow) discountRow.style.display = discount > 0 ? "flex" : "none";
     if (discountEl) discountEl.textContent = "-" + formatPrice(discount);
-    const finalTotal = Math.max(0, subtotal - discount);
+    const finalTotal = Math.max(0, subtotal - discount + shipping);
     if (totalEl) totalEl.textContent = formatPrice(finalTotal);
     if (upiAmountEl) upiAmountEl.textContent = formatPrice(finalTotal);
   }
@@ -301,7 +306,7 @@ function initCheckoutPage() {
         return;
       }
       upiSection.style.display = "block";
-      upiAmountEl.textContent = formatPrice(Math.max(0, subtotal - currentDiscount));
+      upiAmountEl.textContent = formatPrice(Math.max(0, subtotal - currentDiscount + shipping));
       getPaymentSettings().then((settings) => {
         if (settings.qr_code_url) {
           upiQrImg.src = settings.qr_code_url;
@@ -506,6 +511,7 @@ async function initOrdersPage() {
         <span>Deliver to: ${order.city || ""} ${order.pin || ""}${order.phone ? ` &middot; ${order.phone}` : ""}</span>
         <span class="order-total">
           ${order.discount > 0 ? `<span style="color:#2e7d32;font-weight:600;margin-right:8px;">${order.promoCode} applied (-${formatPrice(order.discount)})</span>` : ""}
+          ${order.shipping > 0 ? `<span style="margin-right:8px;">Shipping: ${formatPrice(order.shipping)}</span>` : ""}
           Total: ${formatPrice(order.total)}
         </span>
       </div>

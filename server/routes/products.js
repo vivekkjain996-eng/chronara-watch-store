@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const { parse: parseCsv } = require("csv-parse/sync");
 const { db, resetProductsToSeed } = require("../db");
 const { requireAdmin } = require("../auth");
 const { storeMedia, deleteMedia, cleanupProductStorage, wipeAllLocalMedia } = require("../lib/media");
@@ -199,6 +200,69 @@ router.delete("/:id", requireAdmin, asyncHandler(async (req, res) => {
   if (info.changes === 0) return res.status(404).json({ error: "Product not found" });
   cleanupProductStorage(req.params.id);
   res.status(204).end();
+}));
+
+const uploadCsv = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 }
+}).single("csv");
+
+function handleCsvUpload(req, res, next) {
+  uploadCsv(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message || "Upload failed" });
+    next();
+  });
+}
+
+const VALID_CATEGORIES = ["men", "women", "smart"];
+
+// Bulk-creates watches from a CSV (name,category,price,strap,description columns). No photos -
+// each row gets images/placeholder-watch.svg as its cover image; admin adds real photos per
+// watch afterward via the existing POST /:id/media flow. Invalid rows are skipped, not fatal,
+// so one bad row out of e.g. 100 doesn't block the rest.
+router.post("/bulk", requireAdmin, handleCsvUpload, asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No CSV file provided" });
+
+  let rows;
+  try {
+    rows = parseCsv(req.file.buffer, { columns: true, skip_empty_lines: true, trim: true });
+  } catch (e) {
+    return res.status(400).json({ error: "Couldn't parse CSV: " + e.message });
+  }
+
+  const errors = [];
+  let createdCount = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowNum = i + 2; // 1-indexed + header row
+    const row = rows[i];
+    const name = (row.name || "").trim();
+    const category = (row.category || "").trim().toLowerCase();
+    const price = Number(row.price);
+    const strap = (row.strap || "").trim();
+    const description = (row.description || "").trim();
+
+    if (!name || !row.category || !strap || !description) {
+      errors.push({ row: rowNum, message: "Missing required field(s)" });
+      continue;
+    }
+    if (!VALID_CATEGORIES.includes(category)) {
+      errors.push({ row: rowNum, message: `Invalid category "${row.category}" - must be men, women, or smart` });
+      continue;
+    }
+    if (!price || price <= 0) {
+      errors.push({ row: rowNum, message: `Invalid price "${row.price}"` });
+      continue;
+    }
+
+    await db.run(
+      "INSERT INTO products (name, category, price, image, strap, description) VALUES (?, ?, ?, ?, ?, ?)",
+      [name, category, price, "images/placeholder-watch.svg", strap, description]
+    );
+    createdCount++;
+  }
+
+  res.status(201).json({ created: createdCount, errors });
 }));
 
 router.post("/reset", requireAdmin, asyncHandler(async (req, res) => {

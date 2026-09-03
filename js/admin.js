@@ -111,6 +111,16 @@ async function renderDashboard(root) {
 function renderProductsTab() {
   const content = document.getElementById("admin-tab-content");
   content.innerHTML = `
+    <div class="form-card" style="max-width:none;margin-bottom:24px;">
+      <h3 style="margin-bottom:6px;">Bulk Upload Watches (CSV)</h3>
+      <p style="font-size:12.5px;color:#6b6b6b;margin-bottom:14px;">Add many watches at once from a CSV file (columns: name, category, price, strap, description). Each gets a placeholder photo - add real photos per watch afterward using Edit. <a href="#" id="admin-csv-template-link">Download CSV template</a></p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="file" id="admin-csv-input" accept=".csv,text/csv">
+        <button type="button" class="btn btn-dark" id="admin-csv-upload-btn" style="padding:10px 20px;">Upload CSV</button>
+      </div>
+      <div id="admin-csv-result" style="margin-top:14px;font-size:13px;"></div>
+    </div>
+
     <div class="admin-layout">
       <div class="admin-table-wrap">
         <table class="cart-table" id="admin-product-table">
@@ -171,6 +181,59 @@ function renderProductsTab() {
 
   renderAdminTable();
   wireAdminForm();
+  wireCsvUpload();
+}
+
+/* ---------- Bulk CSV upload ---------- */
+function wireCsvUpload() {
+  const templateLink = document.getElementById("admin-csv-template-link");
+  templateLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    const csv = "name,category,price,strap,description\n" +
+      `"Chronara Example",men,9999,"Stainless Steel","A short description of the watch."\n`;
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "chronara-watches-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  const csvInput = document.getElementById("admin-csv-input");
+  const uploadBtn = document.getElementById("admin-csv-upload-btn");
+  const resultEl = document.getElementById("admin-csv-result");
+
+  uploadBtn.addEventListener("click", async () => {
+    const file = csvInput.files[0];
+    if (!file) {
+      resultEl.innerHTML = `<p style="color:#a6262b;">Choose a CSV file first.</p>`;
+      return;
+    }
+    uploadBtn.disabled = true;
+    resultEl.innerHTML = `<p style="color:#6b6b6b;">Uploading…</p>`;
+    try {
+      const formData = new FormData();
+      formData.append("csv", file);
+      const result = await bulkUploadProducts(formData);
+      let html = `<p style="color:#2e7d32;font-weight:600;">Created ${result.created} watch${result.created === 1 ? "" : "es"}.</p>`;
+      if (result.errors.length) {
+        html += `<p style="color:#a6262b;font-weight:600;margin-top:8px;">${result.errors.length} row(s) had errors:</p>
+          <ul style="margin-left:18px;color:#a6262b;font-size:12.5px;">
+            ${result.errors.map(e => `<li>Row ${e.row}: ${e.message}</li>`).join("")}
+          </ul>`;
+      }
+      resultEl.innerHTML = html;
+      renderAdminTable();
+      csvInput.value = "";
+    } catch (err) {
+      resultEl.innerHTML = `<p style="color:#a6262b;">Upload failed: ${err.message}</p>`;
+    } finally {
+      uploadBtn.disabled = false;
+    }
+  });
 }
 
 function renderAdminTable() {
@@ -505,7 +568,7 @@ async function renderOrdersTab() {
         ${order.paymentStatus === "Pending Verification" ? `<button type="button" class="btn btn-dark admin-verify-payment-btn" data-id="${order.id}" style="padding:6px 14px;font-size:11.5px;">Verify Payment</button>` : ""}
       </div>` : ""}
       <div class="order-card-foot">
-        <span>${order.discount > 0 ? `Promo: ${order.promoCode} (-${formatPrice(order.discount)})` : ""}</span>
+        <span>${order.discount > 0 ? `Promo: ${order.promoCode} (-${formatPrice(order.discount)})` : ""}${order.shipping > 0 ? ` &nbsp;|&nbsp; Shipping: ${formatPrice(order.shipping)}` : ""}</span>
         <span class="order-total">Total: ${formatPrice(order.total)}</span>
       </div>
     </div>`;

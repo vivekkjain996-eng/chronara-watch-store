@@ -50,6 +50,15 @@ async function resetCatalogToDemoData() {
   await loadProducts();
 }
 
+// formData: single "csv" file (name,category,price,strap,description columns). Returns
+// { created, errors: [{ row, message }] } - created rows get a placeholder cover image since
+// a CSV can't carry photo files; add real photos per-watch afterward.
+async function bulkUploadProducts(formData) {
+  const result = await apiUpload("POST", "/api/products/bulk", formData);
+  await loadProducts();
+  return result;
+}
+
 function formatPrice(value) {
   return "₹" + Number(value).toLocaleString("en-IN");
 }
