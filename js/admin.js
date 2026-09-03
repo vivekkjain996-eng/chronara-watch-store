@@ -65,7 +65,8 @@ function renderLogin(root) {
 const ADMIN_TABS = [
   { key: "products", label: "Manage Watches", render: () => renderProductsTab() },
   { key: "orders", label: "Orders", render: () => renderOrdersTab() },
-  { key: "promos", label: "Promo Codes", render: () => renderPromosTab() }
+  { key: "promos", label: "Promo Codes", render: () => renderPromosTab() },
+  { key: "payment", label: "Payment Settings", render: () => renderPaymentSettingsTab() }
 ];
 
 async function renderDashboard(root) {
@@ -456,7 +457,22 @@ async function renderOrdersTab() {
 
   const statuses = ["Processing", "Shipped", "Delivered", "Cancelled"];
 
-  content.innerHTML = orders.map(order => `
+  // Whichever order is chronologically first for a given phone is that customer's first ever
+  // order here - tag it "New Customer", everything after "Returning". Same phone-based logic
+  // already used for first-order promo eligibility (server/lib/promo.js), just surfaced here.
+  const earliestByPhone = {};
+  orders.forEach(o => {
+    if (!o.phone) return;
+    if (!earliestByPhone[o.phone] || o.date < earliestByPhone[o.phone].date) {
+      earliestByPhone[o.phone] = o;
+    }
+  });
+
+  content.innerHTML = orders.map(order => {
+    const customerTag = !order.phone ? "" : (earliestByPhone[order.phone].id === order.id
+      ? `<span style="background:#e8f5e9;color:#2e7d32;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:12px;margin-left:8px;">New Customer</span>`
+      : `<span style="background:#eef2f7;color:#0d1b2a;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:12px;margin-left:8px;">Returning</span>`);
+    return `
     <div class="order-card">
       <div class="order-card-head">
         <div>
@@ -468,7 +484,7 @@ async function renderOrdersTab() {
         </select>
       </div>
       <div style="font-size:13.5px;color:#333;margin:8px 0;">
-        <div><strong>${order.customerName || "Unknown"}</strong> &nbsp;|&nbsp; ${order.email || ""}${order.phone ? ` &nbsp;|&nbsp; ${order.phone}` : ""}</div>
+        <div><strong>${order.customerName || "Unknown"}</strong> &nbsp;|&nbsp; ${order.email || ""}${order.phone ? ` &nbsp;|&nbsp; ${order.phone}` : ""}${customerTag}</div>
         <div style="color:#6b6b6b;">${order.address || ""}${order.address ? "," : ""} ${order.city || ""} ${order.pin || ""}</div>
         <div style="color:#6b6b6b;">Payment: ${order.payment || "-"}</div>
       </div>
@@ -483,11 +499,17 @@ async function renderOrdersTab() {
             <div class="order-item-price">${formatPrice(item.price * item.qty)}</div>
           </div>`).join("")}
       </div>
+      ${order.paymentStatus && order.paymentStatus !== "Not Required" ? `
+      <div style="padding:10px 20px;background:${order.paymentStatus === "Verified" ? "#e8f5e9" : "#fdf6e3"};border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:13px;">
+        <span>UPI UTR: <strong>${order.utr || "-"}</strong> &nbsp;|&nbsp; Payment: <strong>${order.paymentStatus}</strong></span>
+        ${order.paymentStatus === "Pending Verification" ? `<button type="button" class="btn btn-dark admin-verify-payment-btn" data-id="${order.id}" style="padding:6px 14px;font-size:11.5px;">Verify Payment</button>` : ""}
+      </div>` : ""}
       <div class="order-card-foot">
         <span>${order.discount > 0 ? `Promo: ${order.promoCode} (-${formatPrice(order.discount)})` : ""}</span>
         <span class="order-total">Total: ${formatPrice(order.total)}</span>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   content.querySelectorAll(".admin-order-status").forEach(select => {
     select.addEventListener("change", async () => {
@@ -498,6 +520,19 @@ async function renderOrdersTab() {
         alert("Couldn't update order status: " + err.message);
       } finally {
         select.disabled = false;
+      }
+    });
+  });
+
+  content.querySelectorAll(".admin-verify-payment-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        await apiPatch(`/api/orders/admin/${btn.dataset.id}/verify-payment`, {});
+        renderOrdersTab();
+      } catch (err) {
+        alert("Couldn't verify payment: " + err.message);
+        btn.disabled = false;
       }
     });
   });
@@ -632,6 +667,67 @@ async function renderPromoTable() {
         alert(err.message);
       }
     });
+  });
+}
+
+/* ---------- Payment Settings tab (UPI QR + ID shown to customers at checkout) ---------- */
+async function renderPaymentSettingsTab() {
+  const content = document.getElementById("admin-tab-content");
+  content.innerHTML = `<p style="color:#6b6b6b;">Loading…</p>`;
+
+  let settings;
+  try {
+    settings = await getPaymentSettings();
+  } catch (err) {
+    content.innerHTML = `<p style="color:#a6262b;">Couldn't load payment settings: ${err.message}</p>`;
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="form-card" style="max-width:480px;">
+      <h3 style="margin-bottom:6px;">UPI Payment Settings</h3>
+      <p style="font-size:12.5px;color:#6b6b6b;margin-bottom:18px;">Shown to customers at checkout when they choose UPI. Upload your UPI QR code and enter your UPI ID.</p>
+      <form id="payment-settings-form">
+        <div class="form-row">
+          <label>UPI ID</label>
+          <input type="text" id="payment-upi-id" placeholder="yourname@bank" value="${settings.upi_id || ""}">
+        </div>
+        <div class="form-row">
+          <label>QR Code Image</label>
+          <input type="file" id="payment-qr-input" accept="image/*">
+          <img id="payment-qr-preview" src="${settings.qr_code_url || ""}" style="max-width:160px;margin-top:10px;border:1px solid var(--border);border-radius:4px;${settings.qr_code_url ? "" : "display:none;"}">
+        </div>
+        <button type="submit" class="btn btn-dark btn-block">Save Payment Settings</button>
+      </form>
+    </div>`;
+
+  const qrInput = document.getElementById("payment-qr-input");
+  const qrPreview = document.getElementById("payment-qr-preview");
+  let pendingQrFile = null;
+
+  qrInput.addEventListener("change", () => {
+    const file = qrInput.files[0];
+    if (!file) return;
+    pendingQrFile = file;
+    qrPreview.src = URL.createObjectURL(file);
+    qrPreview.style.display = "block";
+  });
+
+  document.getElementById("payment-settings-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = e.target.querySelector("button[type=submit]");
+    submitBtn.disabled = true;
+    try {
+      const formData = new FormData();
+      formData.append("upiId", document.getElementById("payment-upi-id").value.trim());
+      if (pendingQrFile) formData.append("qrCode", pendingQrFile);
+      await savePaymentSettings(formData);
+      renderPaymentSettingsTab();
+    } catch (err) {
+      alert("Couldn't save payment settings: " + err.message);
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 }
 

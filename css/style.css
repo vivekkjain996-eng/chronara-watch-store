@@ -54,11 +54,13 @@ header.site-header {
   z-index: 100;
 }
 
-.header-inner {
+/* Top row: logo + search + account/cart/orders icons */
+.header-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 14px 24px;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -70,31 +72,67 @@ header.site-header {
   font-size: 22px;
   font-weight: bold;
   color: var(--navy);
+  flex-shrink: 0;
 }
 .logo img { width: 34px; height: 34px; }
 
-nav.main-nav ul {
-  display: flex;
-  gap: 32px;
-  font-size: 14.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-nav.main-nav a { transition: color .15s; }
-nav.main-nav a:hover, nav.main-nav a.active { color: var(--gold-dark); }
-
-.header-actions {
+.header-search {
   display: flex;
   align-items: center;
-  gap: 20px;
+  flex: 1 1 240px;
+  min-width: 160px;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 3px 4px 3px 18px;
+}
+.header-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 8px 0;
+}
+.header-search input:focus { outline: none; }
+.header-search button {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  font-size: 15px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .15s;
+}
+.header-search button:hover { background: #fff; }
+
+.header-icons {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-shrink: 0;
 }
 
-.icon-link {
-  position: relative;
-  font-size: 20px;
+.header-icon-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  color: var(--text);
+  transition: color .15s;
 }
+.header-icon-link:hover { color: var(--gold-dark); }
+.header-icon-link .icon { position: relative; display: inline-block; font-size: 19px; line-height: 1; }
 
 .cart-count {
   position: absolute;
@@ -112,7 +150,25 @@ nav.main-nav a:hover, nav.main-nav a.active { color: var(--gold-dark); }
   justify-content: center;
 }
 
-.nav-toggle { display: none; font-size: 24px; background: none; border: none; cursor: pointer; }
+/* Bottom row: category nav */
+nav.main-nav { border-top: 1px solid var(--border); }
+nav.main-nav ul {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  padding: 11px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+nav.main-nav a { transition: color .15s; }
+nav.main-nav a:hover, nav.main-nav a.active { color: var(--gold-dark); }
+
+.nav-toggle { display: none; font-size: 22px; background: none; border: none; cursor: pointer; }
 
 /* Hero */
 .hero {
@@ -403,15 +459,16 @@ footer.site-footer { background: var(--navy); color: #cfd8e3; padding: 60px 24px
 }
 
 @media (max-width: 680px) {
-  /* Header collapses to logo + actions on one row; the nav (toggled via JS setting
-     display:block) drops to its own full-width row below rather than squeezing into
-     the flex row next to the logo. */
-  .header-inner { flex-wrap: wrap; padding: 14px 16px; }
+  /* Search wraps to its own line below logo+icons (flex-wrap on .header-top already
+     handles this); the category nav (toggled via JS setting display:block) is already
+     its own row structurally, so it just needs to switch to a vertical dropdown list. */
+  .header-top { padding: 12px 16px; gap: 12px; }
   .logo { font-size: 18px; gap: 6px; }
   .logo img { width: 26px; height: 26px; }
-  .header-actions { gap: 12px; }
-  nav.main-nav { display: none; order: 3; width: 100%; }
-  nav.main-nav ul { flex-direction: column; gap: 0; padding-top: 10px; }
+  .header-search { order: 3; flex-basis: 100%; max-width: none; }
+  .header-icons { gap: 14px; }
+  nav.main-nav { display: none; }
+  nav.main-nav ul { flex-direction: column; gap: 0; padding: 0; }
   nav.main-nav ul li { border-top: 1px solid var(--border); }
   nav.main-nav a { display: block; padding: 12px 4px; }
   .nav-toggle { display: block; }

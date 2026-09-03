@@ -11,25 +11,30 @@
 <div class="announce-bar">FREE SHIPPING ON ORDERS ABOVE ₹5,000 &nbsp;|&nbsp; DEMO STORE — NO REAL PAYMENTS TAKEN</div>
 
 <header class="site-header">
-  <div class="header-inner">
+  <div class="header-top">
     <a href="index.html" class="logo"><img src="images/logo.svg" alt="Chronara logo"> Chronara</a>
-    <nav class="main-nav">
-      <ul>
-        <li><a href="index.html">Home</a></li>
-        <li><a href="shop.html">Shop</a></li>
-        <li><a href="shop.html?category=men">Men</a></li>
-        <li><a href="shop.html?category=women">Women</a></li>
-        <li><a href="shop.html?category=smart">Smart</a></li>
-        <li><a href="about.html" class="active">About</a></li>
-        <li><a href="contact.html">Contact</a></li>
-      </ul>
-    </nav>
-    <div class="header-actions">
-      <a href="orders.html" class="icon-link" title="My Orders" style="font-size:15px;font-weight:600;">Orders</a>
-      <a href="cart.html" class="icon-link">🛒<span class="cart-count">0</span></a>
+    <form class="header-search" action="shop.html" method="get">
+      <input type="search" name="q" placeholder="Search watches" aria-label="Search watches">
+      <button type="submit" aria-label="Search">🔍</button>
+    </form>
+    <div class="header-icons">
+      <a href="login.html" id="header-account-link" class="header-icon-link"><span class="icon">👤</span><span class="label">Log In</span></a>
+      <a href="orders.html" class="header-icon-link"><span class="icon">📦</span><span>Orders</span></a>
+      <a href="cart.html" class="header-icon-link"><span class="icon">🛒<span class="cart-count">0</span></span><span>Cart</span></a>
       <button class="nav-toggle">☰</button>
     </div>
   </div>
+  <nav class="main-nav">
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="shop.html">Shop</a></li>
+      <li><a href="shop.html?category=men">Men</a></li>
+      <li><a href="shop.html?category=women">Women</a></li>
+      <li><a href="shop.html?category=smart">Smart</a></li>
+      <li><a href="about.html" class="active">About</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </nav>
 </header>
 
 <div class="about-hero">
@@ -81,7 +86,10 @@
   <div class="footer-bottom">&copy; 2026 Chronara. Demo project — not a real business. &nbsp;|&nbsp; <a href="admin.html" style="color:#9fb0c2;">Admin Login</a></div>
 </footer>
 
+<script src="js/api.js"></script>
 <script src="js/products.js"></script>
 <script src="js/cart.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

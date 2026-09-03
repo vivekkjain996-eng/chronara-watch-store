@@ -116,6 +116,12 @@ const SCHEMA_STATEMENTS = [
     first_order_only INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS payment_settings (
+    id INTEGER PRIMARY KEY,
+    upi_id TEXT,
+    qr_code_url TEXT,
+    qr_code_public_id TEXT
   )`
 ];
 
@@ -178,6 +184,8 @@ async function init() {
   await ensureColumn("orders", "promo_code", "TEXT");
   await ensureColumn("orders", "discount", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn("orders", "phone", "TEXT");
+  await ensureColumn("orders", "utr", "TEXT");
+  await ensureColumn("orders", "payment_status", "TEXT NOT NULL DEFAULT 'Not Required'");
   await ensureColumn("product_media", "public_id", "TEXT");
   await seedProductsIfEmpty();
 }

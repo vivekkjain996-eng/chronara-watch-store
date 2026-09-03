@@ -6,8 +6,10 @@ function getAdminToken() {
   return sessionStorage.getItem(ADMIN_TOKEN_KEY);
 }
 
+// localStorage (not sessionStorage) - customer login is a persistent "stay logged in" account
+// session (Flipkart/Goibibo-style), not scoped to one tab/visit.
 function getCustomerToken() {
-  return sessionStorage.getItem(CUSTOMER_TOKEN_KEY);
+  return localStorage.getItem(CUSTOMER_TOKEN_KEY);
 }
 
 // Admin pages and customer checkout never coexist in the same session in practice, and they

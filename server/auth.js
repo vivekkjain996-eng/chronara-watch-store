@@ -41,9 +41,10 @@ function requireAdmin(req, res, next) {
   }
 }
 
-// Customer auth: issued after phone+OTP verification at checkout (see server/routes/auth.js
-// and server/lib/otp.js). Short-lived - just long enough to finish placing an order.
-const CUSTOMER_TOKEN_TTL = "45m";
+// Customer auth: issued after phone+OTP verification (see server/routes/auth.js and
+// server/lib/otp.js). Long-lived, like a real "stay logged in" account session (Flipkart/
+// Goibibo-style) - not just long enough for one checkout.
+const CUSTOMER_TOKEN_TTL = "30d";
 
 function issueCustomerToken(phone) {
   return jwt.sign({ role: "customer", phone }, JWT_SECRET, { expiresIn: CUSTOMER_TOKEN_TTL });

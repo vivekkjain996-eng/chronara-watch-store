@@ -273,14 +273,45 @@ function initCheckoutPage() {
   const sendOtpBtn = document.getElementById("checkout-send-otp-btn");
   const verifyOtpBtn = document.getElementById("checkout-verify-otp-btn");
   const phoneStatus = document.getElementById("checkout-phone-status");
+  const paymentSelect = document.getElementById("checkout-payment");
+  const upiSection = document.getElementById("checkout-upi-section");
+  const upiAmountEl = document.getElementById("checkout-upi-amount");
+  const upiQrImg = document.getElementById("checkout-upi-qr");
+  const upiIdEl = document.getElementById("checkout-upi-id");
+  const utrInput = document.getElementById("checkout-utr");
+
+  let currentDiscount = 0;
 
   if (subtotalEl) subtotalEl.textContent = formatPrice(subtotal);
   if (totalEl) totalEl.textContent = formatPrice(subtotal);
 
   function updateTotals(discount) {
+    currentDiscount = discount;
     if (discountRow) discountRow.style.display = discount > 0 ? "flex" : "none";
     if (discountEl) discountEl.textContent = "-" + formatPrice(discount);
-    if (totalEl) totalEl.textContent = formatPrice(Math.max(0, subtotal - discount));
+    const finalTotal = Math.max(0, subtotal - discount);
+    if (totalEl) totalEl.textContent = formatPrice(finalTotal);
+    if (upiAmountEl) upiAmountEl.textContent = formatPrice(finalTotal);
+  }
+
+  if (paymentSelect) {
+    paymentSelect.addEventListener("change", () => {
+      if (paymentSelect.value !== "UPI") {
+        upiSection.style.display = "none";
+        return;
+      }
+      upiSection.style.display = "block";
+      upiAmountEl.textContent = formatPrice(Math.max(0, subtotal - currentDiscount));
+      getPaymentSettings().then((settings) => {
+        if (settings.qr_code_url) {
+          upiQrImg.src = settings.qr_code_url;
+          upiQrImg.style.display = "block";
+        }
+        upiIdEl.textContent = settings.upi_id ? `UPI ID: ${settings.upi_id}` : "";
+      }).catch(() => {
+        upiIdEl.textContent = "Couldn't load payment details - try refreshing.";
+      });
+    });
   }
 
   function showPromoMessage(text, ok) {
@@ -390,6 +421,11 @@ function initCheckoutPage() {
       return p ? { id: p.id, name: p.name, image: p.image, price: p.price, qty: item.qty } : null;
     }).filter(Boolean);
 
+    if (paymentSelect.value === "UPI" && !(utrInput.value || "").trim()) {
+      alert("Enter the UTR from your UPI app after paying.");
+      return;
+    }
+
     const submitBtn = form.querySelector("button[type=submit]");
     submitBtn.disabled = true;
 
@@ -402,7 +438,8 @@ function initCheckoutPage() {
         city: document.getElementById("checkout-city").value,
         pin: document.getElementById("checkout-pin").value,
         address: document.getElementById("checkout-address").value,
-        payment: document.getElementById("checkout-payment").value
+        payment: paymentSelect.value,
+        utr: paymentSelect.value === "UPI" ? utrInput.value.trim() : undefined
       });
 
       saveCart([]); // clear cart - demo order "placed"
@@ -415,25 +452,40 @@ function initCheckoutPage() {
   });
 }
 
-/* ---------- Order history (customer-facing) ---------- */
+/* ---------- Order history (customer-facing, real account history - see js/auth.js) ---------- */
 async function initOrdersPage() {
   const root = document.getElementById("orders-root");
   if (!root) return;
 
-  const orders = await getOrders();
-  if (!orders.length) {
-    root.innerHTML = `<div class="empty-state"><h3>No orders yet</h3><p>Your past orders will show up here once you place one.</p><br><a class="btn btn-dark" href="shop.html">Start Shopping</a></div>`;
+  if (!isPhoneVerified()) {
+    root.innerHTML = `<div class="empty-state"><h3>Log in to view your orders</h3><p>Your order history is tied to your account, so it follows you across devices.</p><br><a class="btn btn-dark" href="login.html?redirect=orders.html">Log In</a></div>`;
     return;
   }
 
-  root.innerHTML = orders.map(order => `
+  const accountBar = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;font-size:13.5px;color:#6b6b6b;">
+      <span>Logged in as <strong style="color:var(--text);">${getVerifiedPhone()}</strong></span>
+      <span class="remove-link" id="orders-logout-btn">Log Out</span>
+    </div>`;
+
+  const orders = await getOrders();
+  if (!orders.length) {
+    root.innerHTML = accountBar + `<div class="empty-state"><h3>No orders yet</h3><p>Your past orders will show up here once you place one.</p><br><a class="btn btn-dark" href="shop.html">Start Shopping</a></div>`;
+    document.getElementById("orders-logout-btn").addEventListener("click", () => { logout(); initOrdersPage(); });
+    return;
+  }
+
+  root.innerHTML = accountBar + orders.map(order => `
     <div class="order-card">
       <div class="order-card-head">
         <div>
           <div class="order-id">Order #${order.id}</div>
           <div class="order-date">${formatOrderDate(order.date)}</div>
         </div>
-        <span class="order-status">${order.status || "Processing"}</span>
+        <div style="text-align:right;">
+          <span class="order-status">${order.status || "Processing"}</span>
+          ${order.paymentStatus && order.paymentStatus !== "Not Required" ? `<div style="margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${order.paymentStatus === "Verified" ? "#2e7d32" : "#b8941f"};">Payment: ${order.paymentStatus}</div>` : ""}
+        </div>
       </div>
       <div class="order-items">
         ${order.items.map(item => `
@@ -454,6 +506,8 @@ async function initOrdersPage() {
         </span>
       </div>
     </div>`).join("");
+
+  document.getElementById("orders-logout-btn").addEventListener("click", () => { logout(); initOrdersPage(); });
 }
 
 /* ---------- Mobile nav ---------- */
@@ -466,8 +520,66 @@ function initMobileNav() {
   });
 }
 
+/* ---------- Login page (phone + OTP account, see js/auth.js) ---------- */
+function initLoginPage() {
+  const sendBtn = document.getElementById("login-send-otp-btn");
+  if (!sendBtn) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const redirect = params.get("redirect") || "index.html";
+
+  if (isPhoneVerified()) {
+    window.location.href = redirect;
+    return;
+  }
+
+  const phoneInput = document.getElementById("login-phone");
+  const otpInput = document.getElementById("login-otp");
+  const otpRow = document.getElementById("login-otp-row");
+  const verifyBtn = document.getElementById("login-verify-otp-btn");
+  const status = document.getElementById("login-status");
+
+  function showStatus(text, ok) {
+    status.style.color = ok ? "#2e7d32" : "#a6262b";
+    status.textContent = text;
+  }
+
+  sendBtn.addEventListener("click", async () => {
+    const phone = (phoneInput.value || "").replace(/\D/g, "");
+    if (phone.length !== 10) {
+      showStatus("Enter a valid 10-digit mobile number.", false);
+      return;
+    }
+    sendBtn.disabled = true;
+    try {
+      const { otp } = await requestOtp(phone);
+      otpRow.style.display = "block";
+      showStatus(`Demo mode — your OTP is ${otp} (no real SMS sent).`, true);
+      sendBtn.textContent = "Resend OTP";
+    } catch (err) {
+      showStatus(err.message, false);
+    } finally {
+      sendBtn.disabled = false;
+    }
+  });
+
+  verifyBtn.addEventListener("click", async () => {
+    const phone = (phoneInput.value || "").replace(/\D/g, "");
+    verifyBtn.disabled = true;
+    try {
+      await verifyOtpCode(phone, otpInput.value);
+      window.location.href = redirect;
+    } catch (err) {
+      showStatus(err.message, false);
+      verifyBtn.disabled = false;
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   initMobileNav();
+  initAccountLink();
+  initLoginPage();
   await loadProducts(); // catalog now comes from the server - load it before rendering anything
   wireAddToCartButtons(document);
   if (document.getElementById("featured-grid")) renderProducts("featured-grid", PRODUCTS.slice(0, 4));

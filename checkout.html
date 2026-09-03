@@ -11,20 +11,21 @@
 <div class="announce-bar">DEMO CHECKOUT — NO REAL PAYMENT WILL BE TAKEN</div>
 
 <header class="site-header">
-  <div class="header-inner">
+  <div class="header-top">
     <a href="index.html" class="logo"><img src="images/logo.svg" alt="Chronara logo"> Chronara</a>
-    <nav class="main-nav">
-      <ul>
-        <li><a href="index.html">Home</a></li>
-        <li><a href="shop.html">Shop</a></li>
-        <li><a href="about.html">About</a></li>
-        <li><a href="contact.html">Contact</a></li>
-      </ul>
-    </nav>
-    <div class="header-actions">
-      <a href="cart.html" class="icon-link">🛒<span class="cart-count">0</span></a>
+    <div class="header-icons" style="margin-left:auto;">
+      <a href="login.html" id="header-account-link" class="header-icon-link"><span class="icon">👤</span><span class="label">Log In</span></a>
+      <a href="cart.html" class="header-icon-link"><span class="icon">🛒<span class="cart-count">0</span></span><span>Cart</span></a>
     </div>
   </div>
+  <nav class="main-nav">
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="shop.html">Shop</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </nav>
 </header>
 
 <div class="breadcrumb"><a href="index.html">Home</a> / <a href="cart.html">Cart</a> / Checkout</div>
@@ -73,12 +74,22 @@
           <textarea rows="3" id="checkout-address" required placeholder="Street, area, landmark..."></textarea>
         </div>
         <div class="form-row">
-          <label>Payment Method (demo only)</label>
+          <label>Payment Method</label>
           <select id="checkout-payment">
             <option>Cash on Delivery</option>
             <option>Card (demo — not processed)</option>
-            <option>UPI (demo — not processed)</option>
+            <option value="UPI">UPI</option>
           </select>
+        </div>
+        <div class="form-row" id="checkout-upi-section" style="display:none;">
+          <div style="text-align:center;background:var(--cream);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+            <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Scan and pay <strong id="checkout-upi-amount">₹0</strong> using any UPI app</p>
+            <img id="checkout-upi-qr" src="" alt="UPI QR code" style="max-width:180px;margin:0 auto 10px;display:none;">
+            <p id="checkout-upi-id" style="font-weight:600;font-size:14px;"></p>
+          </div>
+          <label style="margin-top:14px;display:block;">UTR / UPI Reference Number</label>
+          <input type="text" id="checkout-utr" placeholder="12-digit UTR from your payment app">
+          <p style="font-size:11.5px;color:#6b6b6b;margin-top:6px;">After paying, enter the UTR shown in your UPI app's transaction history — this is used to verify your payment. Your order will show as "Pending Verification" until confirmed.</p>
         </div>
         <div class="form-row">
           <label>Promo Code</label>
@@ -113,6 +124,7 @@
 <script src="js/cart.js"></script>
 <script src="js/orders.js"></script>
 <script src="js/promos.js"></script>
+<script src="js/payment.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/app.js"></script>
 </body>

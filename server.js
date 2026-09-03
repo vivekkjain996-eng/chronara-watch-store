@@ -10,6 +10,7 @@ const ordersRouter = require("./server/routes/orders");
 const adminAuthRouter = require("./server/routes/admin");
 const promosRouter = require("./server/routes/promos");
 const customerAuthRouter = require("./server/routes/auth");
+const paymentRouter = require("./server/routes/payment");
 
 const app = express();
 const port = process.env.PORT || 8899;
@@ -34,6 +35,7 @@ app.use("/api/orders", ordersRouter);
 app.use("/api/admin", adminAuthRouter);
 app.use("/api/promos", promosRouter);
 app.use("/api/auth", customerAuthRouter);
+app.use("/api/payment-settings", paymentRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

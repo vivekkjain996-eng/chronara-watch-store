@@ -1,7 +1,8 @@
-// Order history for the Chronara demo storefront. Orders are now stored server-side
-// (SQLite via /api/orders), so admin can see every order from every customer/device.
-// A customer's own "My Orders" page is scoped by a random per-browser customerId - not a
-// real account system, but enough to keep "my orders" private-ish without one.
+// Order history for the Chronara demo storefront. Orders are stored server-side, so admin can
+// see every order from every customer/device. customerId is still sent when placing an order
+// (kept for robustness), but "My Orders" itself is now scoped by the logged-in phone account
+// (see js/auth.js) - real account history that follows the customer across devices, not a
+// per-browser id.
 const CUSTOMER_ID_KEY = "chronara_customer_id";
 
 function getCustomerId() {
@@ -18,8 +19,10 @@ async function placeOrder(orderDetails) {
   return order;
 }
 
+// Requires being logged in (see js/auth.js) - the server resolves "my orders" from the
+// Authorization header's phone, not a query param.
 async function getOrders() {
-  return apiGet(`/api/orders?customerId=${encodeURIComponent(getCustomerId())}`);
+  return apiGet("/api/orders");
 }
 
 function formatOrderDate(isoString) {

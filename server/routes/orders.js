@@ -1,7 +1,8 @@
 const express = require("express");
 const { db } = require("../db");
-const { requireAdmin, requireCustomer } = require("../auth");
+const { requireAdmin, requireCustomer, optionalCustomer } = require("../auth");
 const { evaluatePromo } = require("../lib/promo");
+const { sendAdminAlert } = require("../lib/mail");
 const asyncHandler = require("../lib/asyncHandler");
 
 const router = express.Router();
@@ -21,6 +22,8 @@ function rowToOrder(row) {
     discount: row.discount || 0,
     promoCode: row.promo_code || null,
     phone: row.phone || null,
+    utr: row.utr || null,
+    paymentStatus: row.payment_status || "Not Required",
     customerName: row.customer_name,
     email: row.email,
     city: row.city,
@@ -38,8 +41,13 @@ router.get("/admin", requireAdmin, asyncHandler(async (req, res) => {
   res.json(rows.map(rowToOrder));
 }));
 
-// Customer: only their own orders ("My Orders"), scoped by the per-browser customerId.
-router.get("/", asyncHandler(async (req, res) => {
+// Customer: "My Orders" - real account history when logged in (scoped by phone, works from any
+// device), falling back to the old per-browser customerId for robustness if not.
+router.get("/", optionalCustomer, asyncHandler(async (req, res) => {
+  if (req.customerPhone) {
+    const rows = await db.all("SELECT * FROM orders WHERE phone = ? ORDER BY date DESC", [req.customerPhone]);
+    return res.json(rows.map(rowToOrder));
+  }
   const customerId = req.query.customerId;
   if (!customerId) return res.json([]);
   const rows = await db.all("SELECT * FROM orders WHERE customer_id = ? ORDER BY date DESC", [customerId]);
@@ -50,7 +58,7 @@ router.get("/", asyncHandler(async (req, res) => {
 // that's what makes first-order promo eligibility below tamper-resistant instead of relying on
 // a client-resettable customerId.
 router.post("/", requireCustomer, asyncHandler(async (req, res) => {
-  const { customerId, items, customerName, email, city, pin, address, payment, promoCode } = req.body;
+  const { customerId, items, customerName, email, city, pin, address, payment, promoCode, utr } = req.body;
   if (!customerId || !Array.isArray(items) || !items.length) {
     return res.status(400).json({ error: "Missing customerId or items" });
   }
@@ -77,12 +85,27 @@ router.post("/", requireCustomer, asyncHandler(async (req, res) => {
   const date = new Date().toISOString();
   const total = subtotal - discount;
 
+  const isUpiWithUtr = payment === "UPI" && utr && String(utr).trim();
+  const paymentStatus = isUpiWithUtr ? "Pending Verification" : "Not Required";
+  const utrValue = isUpiWithUtr ? String(utr).trim() : null;
+
   await db.run(
-    `INSERT INTO orders (id, customer_id, date, items, total, promo_code, discount, phone, customer_name, email, city, pin, address, payment, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO orders (id, customer_id, date, items, total, promo_code, discount, phone, customer_name, email, city, pin, address, payment, status, utr, payment_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [orderId, customerId, date, JSON.stringify(items), total, appliedCode, discount, phone,
-      customerName || "", email || "", city || "", pin || "", address || "", payment || "", "Processing"]
+      customerName || "", email || "", city || "", pin || "", address || "", payment || "", "Processing",
+      utrValue, paymentStatus]
   );
+
+  if (isUpiWithUtr) {
+    sendAdminAlert(
+      `New UPI payment to verify - Order #${orderId}`,
+      `<p><strong>Order #${orderId}</strong> - ₹${total}</p>
+       <p>Customer: ${customerName || ""} (${phone})</p>
+       <p><strong>UTR: ${utrValue}</strong></p>
+       <p>Check this against your bank/UPI app, then mark it verified in the admin Orders tab.</p>`
+    ); // not awaited - an email failure shouldn't fail order placement
+  }
 
   res.status(201).json(rowToOrder(await db.get("SELECT * FROM orders WHERE id = ?", [orderId])));
 }));
@@ -94,6 +117,15 @@ router.patch("/admin/:id", requireAdmin, asyncHandler(async (req, res) => {
 
   const info = await db.run("UPDATE orders SET status = ? WHERE id = ?", [status, req.params.id]);
   if (info.changes === 0) return res.status(404).json({ error: "Order not found" });
+  res.json(rowToOrder(await db.get("SELECT * FROM orders WHERE id = ?", [req.params.id])));
+}));
+
+router.patch("/admin/:id/verify-payment", requireAdmin, asyncHandler(async (req, res) => {
+  const info = await db.run(
+    "UPDATE orders SET payment_status = 'Verified' WHERE id = ? AND payment_status = 'Pending Verification'",
+    [req.params.id]
+  );
+  if (info.changes === 0) return res.status(404).json({ error: "Order not found or not pending verification" });
   res.json(rowToOrder(await db.get("SELECT * FROM orders WHERE id = ?", [req.params.id])));
 }));
 
