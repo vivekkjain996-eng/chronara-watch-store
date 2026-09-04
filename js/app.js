@@ -154,7 +154,7 @@ async function initProductDetailPage() {
       <div class="detail-meta">
         <div><span>Strap</span><span>${product.strap}</span></div>
         <div><span>Water Resistance</span><span>50m</span></div>
-        <div><span>Warranty</span><span>6 Months</span></div>
+        <div><span>Warranty</span><span>${product.price > 10000 ? "1 Year" : "6 Months"}</span></div>
       </div>
       <div class="qty-row">
         <div class="qty-control">
