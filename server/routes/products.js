@@ -223,11 +223,27 @@ function handleCsvUpload(req, res, next) {
 }
 
 const VALID_CATEGORIES = ["men", "women", "smart"];
+const MAX_CSV_IMAGES_PER_ROW = 8;
 
-// Bulk-creates watches from a CSV (name,category,price,strap,description columns). No photos -
-// each row gets images/placeholder-watch.svg as its cover image; admin adds real photos per
-// watch afterward via the existing POST /:id/media flow. Invalid rows are skipped, not fatal,
-// so one bad row out of e.g. 100 doesn't block the rest.
+// Downloads an image URL into the same {buffer, originalname, mimetype} shape multer gives
+// per-file uploads, so it can go through the existing insertMedia/storeMedia pipeline unchanged
+// (Cloudinary or local disk, whichever is active) instead of a separate URL-upload path.
+async function downloadImageFile(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Server responded ${res.status}`);
+  const contentType = (res.headers.get("content-type") || "").split(";")[0].trim();
+  if (!contentType.startsWith("image/")) throw new Error("URL did not return an image");
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const ext = contentType.split("/")[1] ? "." + contentType.split("/")[1] : "";
+  return { buffer, originalname: "image" + ext, mimetype: contentType };
+}
+
+// Bulk-creates watches from a CSV (name,category,price,strap,description columns, plus an
+// optional "images" column - one or more photo URLs separated by "|"). Each URL is fetched and
+// stored through the normal media pipeline; a row with no images (or where every URL fails)
+// falls back to the placeholder cover image, same as before, and photos can still be added/fixed
+// afterward via Edit. Invalid rows/URLs are skipped, not fatal, so one bad row or bad image link
+// out of e.g. 100 doesn't block the rest.
 router.post("/bulk", requireAdmin, handleCsvUpload, asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No CSV file provided" });
 
@@ -263,11 +279,28 @@ router.post("/bulk", requireAdmin, handleCsvUpload, asyncHandler(async (req, res
       continue;
     }
 
-    await db.run(
+    const info = await db.run(
       "INSERT INTO products (name, category, price, image, strap, description) VALUES (?, ?, ?, ?, ?, ?)",
       [name, category, price, "images/placeholder-watch.svg", strap, description]
     );
     createdCount++;
+
+    const imageUrls = (row.images || "").split("|").map((u) => u.trim()).filter(Boolean).slice(0, MAX_CSV_IMAGES_PER_ROW);
+    if (imageUrls.length) {
+      const productId = info.lastInsertRowid;
+      const files = [];
+      for (const url of imageUrls) {
+        try {
+          files.push(await downloadImageFile(url));
+        } catch (e) {
+          errors.push({ row: rowNum, message: `Couldn't fetch image "${url}": ${e.message}` });
+        }
+      }
+      if (files.length) {
+        await insertMedia(productId, files, [], null);
+        await syncCoverImage(productId);
+      }
+    }
   }
 
   res.status(201).json({ created: createdCount, errors });

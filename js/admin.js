@@ -114,7 +114,7 @@ function renderProductsTab() {
   content.innerHTML = `
     <div class="form-card" style="max-width:none;margin-bottom:24px;">
       <h3 style="margin-bottom:6px;">Bulk Upload Watches (CSV)</h3>
-      <p style="font-size:12.5px;color:#6b6b6b;margin-bottom:14px;">Add many watches at once from a CSV file (columns: name, category, price, strap, description). Each gets a placeholder photo - add real photos per watch afterward using Edit. <a href="#" id="admin-csv-template-link">Download CSV template</a></p>
+      <p style="font-size:12.5px;color:#6b6b6b;margin-bottom:14px;">Add many watches at once from a CSV file (columns: name, category, price, strap, description, images). For "images", paste one or more photo URLs separated by <code>|</code> - each is fetched automatically, so a watch can have multiple photos right away. Leave it blank to use a placeholder photo (add real photos afterward using Edit). <a href="#" id="admin-csv-template-link">Download CSV template</a></p>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <input type="file" id="admin-csv-input" accept=".csv,text/csv">
         <button type="button" class="btn btn-dark" id="admin-csv-upload-btn" style="padding:10px 20px;">Upload CSV</button>
@@ -190,8 +190,8 @@ function wireCsvUpload() {
   const templateLink = document.getElementById("admin-csv-template-link");
   templateLink.addEventListener("click", (e) => {
     e.preventDefault();
-    const csv = "name,category,price,strap,description\n" +
-      `"Chronara Example",men,9999,"Stainless Steel","A short description of the watch."\n`;
+    const csv = "name,category,price,strap,description,images\n" +
+      `"Chronara Example",men,9999,"Stainless Steel","A short description of the watch.","https://example.com/photo1.jpg|https://example.com/photo2.jpg"\n`;
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
